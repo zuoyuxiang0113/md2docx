@@ -1,0 +1,20 @@
+Third-Party Software Notice
+===========================
+
+This application bundles Pandoc 3.12.1.
+
+Pandoc
+Copyright (C) 2006-2024 John MacFarlane.
+
+Pandoc is licensed under the GNU General Public License,
+version 2 or later (GPL-2.0-or-later).
+
+The complete copyright and license information is included in:
+runtime/pandoc/COPYRIGHT.txt
+runtime/pandoc/COPYING.rtf
+
+Pandoc source code:
+https://github.com/jgm/pandoc/tree/3.12.1
+
+Pandoc project website:
+https://pandoc.org/

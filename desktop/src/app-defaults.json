@@ -1,0 +1,26 @@
+{
+  "lastProfileId": "default",
+  "general": {
+    "appearance": "system",
+    "accentColor": null,
+    "density": "comfortable",
+    "language": "zh",
+    "startupTask": "restore",
+    "startupWindowSize": "medium",
+    "serverPort": 5173,
+    "launchMaximized": false,
+    "confirmClose": true,
+    "confirmReset": true,
+    "shortcutsEnabled": true
+  },
+  "files": { "dragDrop": true, "recursive": false },
+  "conversion": {
+    "onConflict": "ask",
+    "batchErrors": "continue",
+    "preflight": true,
+    "defaultOutputDirectory": "",
+    "afterSuccess": "none",
+    "missingImages": "warning"
+  },
+  "logs": { "enabled": true, "level": "INFO", "autoCleanup": true, "retentionDays": 7, "displayLimit": 200 }
+}

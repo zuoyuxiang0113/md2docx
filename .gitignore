@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+dist/
+build/
+
+# Electron / Vite
+desktop/node_modules/
+desktop/.npmrc
+desktop/dist/
+desktop/.vite/
+desktop/.cache/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Generated release products
+release/cli/
+release/desktop/
+
+# Local runtime and user data
+.env
+.env.*
+*.local
+coverage/
+.wrangler/
+.dev.vars
+.dev.vars.*
+node_modules/
+
+# Optional local runtime binaries; obtain Pandoc separately for development builds.
+runtime/pandoc/pandoc.exe
+
+# Editor and OS files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Temporary conversion files
+*.tmp
+*.bak
+*.warnings.json
+*.docx
+

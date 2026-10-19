@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "md2docx"
+version = "0.2.0"
+description = "Configurable Markdown to DOCX converter"
+requires-python = ">=3.10"
+dependencies = ["python-docx>=1.1", "lxml>=5"]
+
+[project.optional-dependencies]
+build = ["pyinstaller>=6.16"]
+
+[project.scripts]
+md2docx = "cli.md2docx_cli:main"
+
+[tool.setuptools]
+packages = ["core", "cli"]
+
+[tool.setuptools.package-data]
+core = ["defaults.json"]

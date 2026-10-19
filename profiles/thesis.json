@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 2,
+  "id": "thesis",
+  "updatedAt": "2026-10-09T00:00:00Z",
+  "page": {
+    "preset": "A4",
+    "orientation": "portrait",
+    "widthCm": 21,
+    "heightCm": 29.7,
+    "topMarginCm": 2.54,
+    "bottomMarginCm": 2.54,
+    "leftMarginCm": 3,
+    "rightMarginCm": 3
+  },
+  "numbering": {
+    "enabled": true,
+    "stripExisting": true,
+    "startAt": 1
+  },
+  "styles": {
+    "normal": {
+      "eastAsia": "宋体",
+      "ascii": "Times New Roman",
+      "sizePt": 12,
+      "lineSpacing": 1.5,
+      "firstLineChars": 2,
+      "alignment": "justify",
+      "color": "000000"
+    },
+    "heading1": {
+      "eastAsia": "黑体",
+      "ascii": "Times New Roman",
+      "sizePt": 16,
+      "bold": true,
+      "alignment": "left",
+      "spaceBeforePt": 18,
+      "spaceAfterPt": 8,
+      "color": "000000"
+    }
+  },
+  "options": {
+    "math": "omml",
+    "mathFallback": "warning",
+    "images": {
+      "alignment": "center",
+      "maxWidthCm": 0,
+      "keepRatio": true,
+      "captionEnabled": true
+    }
+  }
+}

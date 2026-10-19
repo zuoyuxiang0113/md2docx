@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#fafbfc">
+  <meta name="description" content="MD2DOCX 是面向 Windows 的 Markdown 转 Word 工具。保留结构，灵活配置样式，并支持批量转换。">
+  <title>MD2DOCX — 让 Markdown，成为正式文档</title>
+  <style>
+    :root {
+      --bg: oklch(99% 0.002 240);
+      --surface: oklch(100% 0 0);
+      --fg: oklch(18% 0.012 250);
+      --muted: oklch(54% 0.012 250);
+      --border: oklch(92% 0.005 250);
+      --accent: oklch(58% 0.18 255);
+      --accent-dark: oklch(48% 0.18 255);
+      --accent-tint: oklch(96% 0.025 255);
+      --success: oklch(54% 0.13 155);
+      --display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+      --body: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+      --mono: ui-monospace, 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.65; }
+    a { color: inherit; text-decoration: none; }
+    button, input { font: inherit; }
+    button, a, input { -webkit-tap-highlight-color: transparent; }
+    :focus-visible { outline: 3px solid oklch(70% 0.12 255); outline-offset: 3px; }
+    .wrap { width: min(1160px, calc(100% - 48px)); margin: 0 auto; }
+    .topbar { position: sticky; z-index: 10; top: 0; height: 68px; border-bottom: 1px solid color-mix(in oklch, var(--border), transparent 20%); background: color-mix(in oklch, var(--bg) 88%, transparent); backdrop-filter: blur(14px); }
+    .nav { display: flex; height: 100%; align-items: center; justify-content: space-between; }
+    .brand { display: inline-flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 720; }
+    .brand-mark { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 7px; color: white; background: var(--fg); font-family: var(--mono); font-size: 12px; font-weight: 700; }
+    .nav-links { display: flex; align-items: center; gap: 30px; color: var(--muted); font-size: 13px; }
+    .nav-links a:hover, .text-link:hover { color: var(--fg); }
+    .nav-action { min-height: 38px; padding: 7px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--fg) !important; font-weight: 620; }
+    .hero { display: grid; min-height: 610px; grid-template-columns: minmax(0, 0.94fr) minmax(470px, 1.06fr); align-items: center; gap: 62px; padding-top: 66px; padding-bottom: 76px; }
+    .eyebrow { display: flex; align-items: center; gap: 9px; margin-bottom: 20px; color: var(--muted); font-size: 12px; font-weight: 620; }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { max-width: 560px; margin-bottom: 20px; font-family: var(--display); font-size: clamp(42px, 5.2vw, 61px); font-weight: 690; line-height: 1.13; letter-spacing: -0.02em; }
+    h1 span { color: var(--accent); }
+    .hero-copy { max-width: 455px; margin-bottom: 28px; color: var(--muted); font-size: 16px; line-height: 1.8; }
+    .hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; }
+    .primary-btn { display: inline-flex; min-height: 46px; align-items: center; justify-content: center; gap: 9px; padding: 0 17px; border: 1px solid var(--accent); border-radius: 6px; color: white; background: var(--accent); font-size: 14px; font-weight: 650; transition: background .16s, border-color .16s, transform .16s; }
+    .primary-btn:hover { transform: translateY(-1px); border-color: var(--accent-dark); background: var(--accent-dark); }
+    .text-link { color: var(--muted); font-size: 13px; font-weight: 560; }
+    .hero-note { margin-top: 18px; color: var(--muted); font-size: 12px; }
+    .product-window { overflow: hidden; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); box-shadow: 0 22px 68px oklch(20% 0.02 250 / 7%); }
+    .window-top { display: flex; height: 46px; align-items: center; justify-content: space-between; padding: 0 15px; border-bottom: 1px solid var(--border); }
+    .window-name { display: flex; align-items: center; gap: 8px; color: var(--fg); font-size: 12px; font-weight: 620; }
+    .window-name .brand-mark { width: 22px; height: 22px; border-radius: 5px; font-size: 9px; }
+    .window-status { display: flex; align-items: center; gap: 6px; color: var(--success); font-size: 11px; }
+    .window-body { display: grid; min-height: 292px; grid-template-columns: 1fr 36px 1fr; align-items: stretch; padding: 16px; gap: 9px; }
+    .doc-pane { min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 6px; background: oklch(99.5% 0.002 240); }
+    .pane-head { display: flex; height: 36px; align-items: center; justify-content: space-between; padding: 0 11px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 10px; }
+    .pane-head strong { color: var(--fg); font-size: 10px; font-weight: 620; }
+    .file-picker { cursor: pointer; color: var(--accent-dark); font-size: 10px; }
+    .file-picker:hover { text-decoration: underline; }
+    .code-content { padding: 15px 12px; color: oklch(37% 0.02 250); font-family: var(--mono); font-size: 10px; line-height: 1.85; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .code-content .syntax { color: var(--accent); font-weight: 700; }
+    .doc-content { padding: 18px 16px; color: var(--fg); font-family: 'Songti SC', SimSun, serif; }
+    .doc-content h3 { margin: 0 0 13px; font-size: 15px; font-weight: 700; }
+    .doc-content p { margin: 0 0 11px; color: oklch(42% 0.01 250); font-size: 10px; line-height: 1.9; }
+    .doc-content ul { margin: 0; padding-left: 16px; color: oklch(42% 0.01 250); font-size: 10px; line-height: 1.9; }
+    .transform-arrow { display: grid; place-items: center; color: var(--accent); font-size: 18px; }
+    .window-bottom { display: flex; min-height: 48px; align-items: center; justify-content: space-between; padding: 0 16px; border-top: 1px solid var(--border); color: var(--muted); font-size: 10px; }
+    .format-tag { padding: 3px 7px; border: 1px solid var(--border); border-radius: 4px; color: var(--fg); font-family: var(--mono); font-size: 9px; }
+    .benefits { display: grid; grid-template-columns: repeat(3, 1fr); padding: 23px 0 25px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .benefit { padding: 2px 26px; border-right: 1px solid var(--border); }
+    .benefit:first-child { padding-left: 0; }
+    .benefit:last-child { border: 0; }
+    .benefit strong { display: block; margin-bottom: 3px; font-size: 13px; font-weight: 650; }
+    .benefit span { color: var(--muted); font-size: 12px; }
+    .section { padding: 92px 0; }
+    .section-heading { max-width: 580px; margin: 0 auto 44px; text-align: center; }
+    .section-kicker { margin-bottom: 10px; color: var(--accent); font-size: 11px; font-weight: 680; }
+    h2 { margin-bottom: 11px; font-family: var(--display); font-size: 34px; font-weight: 670; line-height: 1.22; letter-spacing: -0.02em; }
+    .section-heading p { margin: 0; color: var(--muted); font-size: 14px; }
+    .feature-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 34px; }
+    .feature { padding-top: 16px; border-top: 1px solid var(--border); }
+    .feature-index { margin-bottom: 17px; color: var(--accent); font-family: var(--mono); font-size: 11px; }
+    .feature h3 { margin-bottom: 7px; font-size: 15px; font-weight: 660; }
+    .feature p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.8; }
+    .workflow { padding: 70px 0; background: oklch(97.5% 0.006 240); }
+    .workflow-inner { display: grid; grid-template-columns: .9fr 1.1fr; align-items: center; gap: 78px; }
+    .workflow-copy h2 { max-width: 380px; text-align: left; }
+    .workflow-copy p { max-width: 400px; color: var(--muted); font-size: 14px; line-height: 1.8; }
+    .steps { display: grid; gap: 20px; }
+    .step { display: grid; grid-template-columns: 30px 1fr; gap: 13px; align-items: start; }
+    .step-number { display: grid; width: 27px; height: 27px; place-items: center; border: 1px solid var(--border); border-radius: 50%; color: var(--accent); background: var(--surface); font-family: var(--mono); font-size: 10px; }
+    .step strong { display: block; margin: 1px 0 3px; font-size: 13px; font-weight: 650; }
+    .step p { margin: 0; color: var(--muted); font-size: 12px; }
+    .download { padding: 86px 0 90px; text-align: center; }
+    .download h2 { margin-bottom: 10px; }
+    .download-copy { margin-bottom: 23px; color: var(--muted); font-size: 13px; }
+    .download-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 11px; }
+    .secondary-btn { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; padding: 0 15px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); font-size: 13px; font-weight: 610; transition: background .16s, border-color .16s; }
+    .secondary-btn:hover { border-color: oklch(78% 0.01 250); background: oklch(96% 0.004 240); }
+    .release-note { margin-top: 17px; color: var(--muted); font-size: 11px; }
+    .footer { border-top: 1px solid var(--border); }
+    .footer-inner { display: flex; min-height: 72px; align-items: center; justify-content: space-between; gap: 20px; color: var(--muted); font-size: 11px; }
+    .footer-links { display: flex; gap: 19px; }
+    .footer-links a:hover { color: var(--fg); }
+    .dialog-backdrop { position: fixed; z-index: 30; inset: 0; display: none; align-items: center; justify-content: center; padding: 20px; background: oklch(15% 0.02 250 / 38%); }
+    .dialog-backdrop.open { display: flex; }
+    .dialog { width: min(430px, 100%); padding: 22px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); box-shadow: 0 18px 60px oklch(18% 0.02 250 / 18%); }
+    .dialog h3 { margin-bottom: 7px; font-size: 17px; }
+    .dialog p { color: var(--muted); font-size: 13px; }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 20px; }
+    .dialog-actions button { min-height: 40px; padding: 0 13px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface); font-size: 12px; font-weight: 600; }
+    .dialog-actions .confirm { border-color: var(--accent); color: white; background: var(--accent); }
+    #file-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+    @media (max-width: 850px) {
+      .hero { min-height: 0; grid-template-columns: 1fr; gap: 42px; padding-top: 64px; }
+      .hero-copy { max-width: 580px; }
+      .product-window { width: min(620px, 100%); margin: 0 auto; }
+      .workflow-inner { grid-template-columns: 1fr 1fr; gap: 40px; }
+    }
+    @media (max-width: 600px) {
+      .wrap { width: min(100% - 36px, 480px); }
+      .topbar { height: 60px; }
+      .nav-links { gap: 13px; }
+      .nav-links a:not(.nav-action) { display: none; }
+      .nav-action { min-height: 35px; padding: 5px 10px; font-size: 12px; }
+      .hero { padding-top: 52px; padding-bottom: 48px; gap: 34px; }
+      h1 { max-width: 440px; font-size: 43px; }
+      .hero-copy { font-size: 14px; }
+      .window-body { min-height: 253px; grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr); gap: 5px; padding: 9px; }
+      .code-content { padding: 12px 8px; font-size: 9px; }
+      .doc-content { padding: 15px 9px; }
+      .doc-content h3 { font-size: 13px; }
+      .doc-content p, .doc-content ul { font-size: 9px; }
+      .benefits { grid-template-columns: 1fr; gap: 14px; padding: 20px 0; }
+      .benefit, .benefit:first-child { padding: 0; border: 0; }
+      .section { padding: 68px 0; }
+      .section-heading { margin-bottom: 32px; text-align: left; }
+      h2 { font-size: 29px; }
+      .feature-grid { grid-template-columns: 1fr; gap: 25px; }
+      .feature { padding-top: 12px; }
+      .feature-index { margin-bottom: 10px; }
+      .workflow { padding: 55px 0; }
+      .workflow-inner { grid-template-columns: 1fr; gap: 28px; }
+      .workflow-copy h2 { font-size: 29px; }
+      .download { padding: 66px 0; }
+      .footer-inner { align-items: flex-start; flex-direction: column; justify-content: center; gap: 8px; padding: 17px 0; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar" data-od-id="site-header">
+    <nav class="nav wrap" aria-label="主导航">
+      <a class="brand" href="#top" data-od-id="brand-home"><span class="brand-mark" aria-hidden="true">M›W</span>MD2DOCX</a>
+      <div class="nav-links">
+        <a href="#features" data-od-id="nav-features">产品能力</a>
+        <a href="#workflow" data-od-id="nav-workflow">工作方式</a>
+        <a href="#download" class="nav-action" data-od-id="nav-download">获取桌面版</a>
+      </div>
+    </nav>
+  </header>
+  <main id="top">
+    <section class="hero wrap" data-od-id="hero-section">
+      <div>
+        <div class="eyebrow"><span class="status-dot" aria-hidden="true"></span>面向 Windows 的 Markdown 文档工具</div>
+        <h1 data-od-id="hero-title">让 Markdown，<br><span>成为正式文档。</span></h1>
+        <p class="hero-copy">从轻量写作到规范交付。把 Markdown 转换为可编辑的 Word 文档，同时保留标题、表格、代码和图片等内容结构。</p>
+        <div class="hero-actions">
+          <a class="primary-btn" href="#download" data-od-id="hero-download">获取 Windows 便携版 <span aria-hidden="true">→</span></a>
+          <a class="text-link" href="#features" data-od-id="hero-learn">了解产品能力</a>
+        </div>
+        <p class="hero-note">本地运行 · 支持批量处理 · 样式可配置</p>
+      </div>
+      <div class="product-window" data-od-id="conversion-preview">
+        <div class="window-top">
+          <div class="window-name"><span class="brand-mark" aria-hidden="true">M›W</span>文档转换</div>
+          <div class="window-status"><span class="status-dot" aria-hidden="true"></span>已就绪</div>
+        </div>
+        <div class="window-body">
+          <div class="doc-pane">
+            <div class="pane-head"><strong>项目说明.md</strong><label class="file-picker" for="file-input" data-od-id="select-markdown">选择文件</label></div>
+            <div class="code-content"><span class="syntax"># 项目说明</span><br><br>## 设计目标<br><br>让内容专注于表达，<br>让格式服务于阅读。<br><br><span class="syntax">-</span> 清晰的文档结构<br><span class="syntax">-</span> 灵活的样式方案</div>
+          </div>
+          <div class="transform-arrow" aria-hidden="true">→</div>
+          <div class="doc-pane">
+            <div class="pane-head"><strong>项目说明.docx</strong><span>Word</span></div>
+            <div class="doc-content"><h3>项目说明</h3><p>设计目标</p><p>让内容专注于表达，让格式服务于阅读。</p><ul><li>清晰的文档结构</li><li>灵活的样式方案</li></ul></div>
+          </div>
+        </div>
+        <div class="window-bottom"><span>结构保留，样式随心</span><span class="format-tag">MD&nbsp; → &nbsp;DOCX</span></div>
+      </div>
+    </section>
+    <section class="wrap" aria-label="产品特点" data-od-id="benefit-strip">
+      <div class="benefits">
+        <div class="benefit"><strong>文件留在本机</strong><span>桌面应用本地处理，不必上传文稿</span></div>
+        <div class="benefit"><strong>Word 样式可配置</strong><span>页面、字体、标题与表格均可调整</span></div>
+        <div class="benefit"><strong>从单篇到批量</strong><span>桌面操作与命令行工作流都支持</span></div>
+      </div>
+    </section>
+    <section class="section wrap" id="features" data-od-id="features-section">
+      <div class="section-heading">
+        <div class="section-kicker">为文档交付而设计</div>
+        <h2 data-od-id="features-title">从写作格式，到交付格式</h2>
+        <p>让熟悉的 Markdown 工作流，也能满足日常文档规范。</p>
+      </div>
+      <div class="feature-grid">
+        <article class="feature" data-od-id="feature-card-structure"><div class="feature-index">01 / 结构</div><h3>保留内容层次</h3><p>标题、列表、引用、表格、代码块与图片按文档结构转换，减少交付前的重复排版。</p></article>
+        <article class="feature" data-od-id="feature-card-style"><div class="feature-index">02 / 样式</div><h3>匹配你的文档规范</h3><p>配置纸张、页边距、中英文字体、字号、行距、标题和表格样式，保存并复用方案。</p></article>
+        <article class="feature" data-od-id="feature-card-batch"><div class="feature-index">03 / 自动化</div><h3>批量处理也从容</h3><p>选择文档或文件夹进行批量转换，也可以通过 CLI 集成到已有脚本和工作流。</p></article>
+      </div>
+    </section>
+    <section class="workflow" id="workflow" data-od-id="workflow-section">
+      <div class="workflow-inner wrap">
+        <div class="workflow-copy">
+          <div class="section-kicker">简单而清晰</div>
+          <h2>三步完成，<br>不打断写作。</h2>
+          <p>先用 Markdown 组织内容，再由 MD2DOCX 生成可以继续编辑的 DOCX 文件。需要时，再调整配置让输出符合你的文档要求。</p>
+        </div>
+        <div class="steps">
+          <div class="step" data-od-id="workflow-step-files"><span class="step-number">01</span><div><strong>选择 Markdown 文件</strong><p>添加单篇文档，或一次选择一个文件夹。</p></div></div>
+          <div class="step" data-od-id="workflow-step-profile"><span class="step-number">02</span><div><strong>选择转换方案</strong><p>使用默认样式，或载入自己的配置。</p></div></div>
+          <div class="step" data-od-id="workflow-step-export"><span class="step-number">03</span><div><strong>生成可编辑的 DOCX</strong><p>查看转换结果与诊断信息，继续在 Word 中编辑。</p></div></div>
+        </div>
+      </div>
+    </section>
+    <section class="download wrap" id="download" data-od-id="download-section">
+      <div class="section-kicker">开始使用</div>
+      <h2 data-od-id="download-title">让下一份文档，少一点重复劳动。</h2>
+      <p class="download-copy">选择适合你的方式：Windows 桌面便携版，或命令行工具。</p>
+      <div class="download-actions">
+        <a class="primary-btn" href="https://github.com/zuoyuxiang0113/md2docx/releases" target="_blank" rel="noreferrer" data-od-id="download-desktop">获取 Windows 便携版 <span aria-hidden="true">→</span></a>
+        <a class="secondary-btn" href="https://github.com/zuoyuxiang0113/md2docx/releases" target="_blank" rel="noreferrer" data-od-id="download-cli">查看 CLI 文件</a>
+      </div>
+      <p class="release-note">发行包将在 GitHub Releases 提供。下载后请完整解压，保留全部文件。</p>
+    </section>
+  </main>
+  <footer class="footer" data-od-id="site-footer">
+    <div class="footer-inner wrap"><a class="brand" href="#top"><span class="brand-mark" aria-hidden="true">M›W</span>MD2DOCX</a><span>为清晰、规范的文档交付而做。</span><div class="footer-links"><a href="https://github.com/zuoyuxiang0113/md2docx" target="_blank" rel="noreferrer">GitHub</a><a href="https://github.com/zuoyuxiang0113/md2docx/issues" target="_blank" rel="noreferrer">反馈</a><a href="#download">下载</a></div></div>
+  </footer>
+  <input id="file-input" type="file" accept=".md,.markdown,.mdown,.mkd,text/markdown,text/plain" multiple aria-label="选择 Markdown 文件">
+  <div class="dialog-backdrop" id="download-dialog" role="presentation">
+    <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title" data-od-id="download-dialog">
+      <h3 id="dialog-title">前往 GitHub Releases</h3>
+      <p id="dialog-message">桌面版和 CLI 会以完整发行包的形式发布在 GitHub Releases。请保留下载包中的完整目录。</p>
+      <div class="dialog-actions"><button class="confirm" type="button" id="dialog-close" data-od-id="dialog-close">知道了</button></div>
+    </section>
+  </div>
+  <script>
+    const fileInput = document.getElementById('file-input');
+    const dialog = document.getElementById('download-dialog');
+    const dialogMessage = document.getElementById('dialog-message');
+    document.getElementById('dialog-close').addEventListener('click', () => dialog.classList.remove('open'));
+    dialog.addEventListener('click', (event) => {
+      if (event.target === dialog) dialog.classList.remove('open');
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') dialog.classList.remove('open');
+    });
+    fileInput.addEventListener('change', () => {
+      const files = Array.from(fileInput.files || []);
+      if (!files.length) return;
+      const first = files[0].name;
+      const total = files.length;
+      const pane = document.querySelector('.code-content');
+      const heading = document.querySelector('.pane-head strong');
+      heading.textContent = first;
+      pane.textContent = total > 1 ? `已选择 ${total} 个 Markdown 文件\n\n示例：${first}\n\n桌面版支持批量转换。` : `已选择文件\n\n${first}\n\n请在 MD2DOCX 桌面版中开始转换。`;
+      document.querySelector('.window-status').lastChild.textContent = '已选择文件';
+      document.querySelector('.window-status .status-dot').style.background = 'var(--accent)';
+    });
+  </script>
+</body>
+</html>

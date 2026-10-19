@@ -1,0 +1,22 @@
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.json text working-tree-encoding=UTF-8
+*.md text working-tree-encoding=UTF-8
+*.py text working-tree-encoding=UTF-8
+*.js text working-tree-encoding=UTF-8
+*.jsx text working-tree-encoding=UTF-8
+*.cjs text working-tree-encoding=UTF-8
+*.mjs text working-tree-encoding=UTF-8
+*.ps1 text working-tree-encoding=UTF-8
+*.html text working-tree-encoding=UTF-8
+*.css text working-tree-encoding=UTF-8
+*.toml text working-tree-encoding=UTF-8
+*.txt text working-tree-encoding=UTF-8
+*.exe binary
+*.dll binary
+*.pyd binary
+*.pak binary
+*.dat binary
+*.bin binary
+*.html linguist-language=HTML
+

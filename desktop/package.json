@@ -1,0 +1,20 @@
+{
+  "name": "md2docx",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Windows-first Markdown to DOCX desktop demo",
+  "main": "src/main.cjs",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "node scripts/dev.cjs",
+    "build": "vite build",
+    "start": "electron ."
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "electron": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "vite": "latest"
+  }
+}
