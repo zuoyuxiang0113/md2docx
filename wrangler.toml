@@ -1,6 +1,7 @@
 name = "md2docx"
 main = "worker.js"
 compatibility_date = "2026-10-19"
+preview_urls = false
 
 [assets]
 directory = "website"
