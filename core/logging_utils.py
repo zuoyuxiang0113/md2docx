@@ -31,8 +31,8 @@ def default_log_dir() -> Path:
         return Path(configured).expanduser()
     app_data = os.environ.get("APPDATA")
     if app_data:
-        return Path(app_data) / "md2docx-desktop-demo" / "logs"
-    return Path.home() / ".config" / "md2docx-desktop-demo" / "logs"
+        return Path(app_data) / "md2docx" / "logs"
+    return Path.home() / ".config" / "md2docx" / "logs"
 
 
 def safe_filename(value: str | os.PathLike[str] | None) -> str | None:

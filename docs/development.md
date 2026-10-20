@@ -24,8 +24,8 @@ python -m pip install -e .
 
 ```powershell
 python cli/md2docx.py doctor --json
-python cli/md2docx.py convert examples/demo_input.md --config profiles/default.json --output output/result.docx
-python cli/md2docx.py batch examples --config profiles/default.json --output-dir output
+python cli/md2docx.py convert path/to/input.md --config profiles/default.json --output output/result.docx
+python cli/md2docx.py batch path/to/markdown-folder --config profiles/default.json --output-dir output
 ```
 
 更多参数见 [CLI 文档](cli.md)。
@@ -50,7 +50,6 @@ npm run dev
 | `cli/` | 命令行参数、JSON 输出和批量任务 |
 | `desktop/` | Electron 主进程、IPC 和 React 界面 |
 | `profiles/` | 开发示例配置 |
-| `examples/` | 示例 Markdown 与配置 |
 | `website/` | 官网静态资源 |
 | `scripts/`、`packaging/` | 构建脚本与 PyInstaller 配置 |
 | `runtime/` | 本地准备的打包运行时 |

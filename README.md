@@ -62,7 +62,6 @@ v0.2.0 是公开预览版。复杂表格、公式和其他复杂内容请检查�
 ## 使用文档
 
 - [CLI 参数、批量策略与退出码](docs/cli.md)
-- [样式配置编辑](docs/profile-editor.md)
 - [JSON 配置协议](docs/config-schema.md)
 - [应用设置与数据存储](docs/app-settings.md)
 - [日志与诊断](docs/logging.md)

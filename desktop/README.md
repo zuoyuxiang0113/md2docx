@@ -5,7 +5,7 @@ Electron + React + Vite 是图形客户端。转换逻辑由项目根目录的 `
 ## 开发
 
 ```powershell
-cd D:\FileConversion\desktop
+cd desktop
 npm install
 npm run dev
 ```
@@ -27,6 +27,6 @@ Pandoc：`MD2DOCX_PANDOC`、`runtime/pandoc/pandoc.exe`、PATH 中的 `pandoc.ex
 ## 构建
 
 ```powershell
-cd D:\FileConversion\desktop
+cd desktop
 npm run build
 ```
