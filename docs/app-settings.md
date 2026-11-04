@@ -1,6 +1,14 @@
 # 应用设置
 
-正式应用设置存放在 Electron `userData/app-settings.json`，默认值来自 `desktop/src/app-defaults.json`。每次启动都从正式设置重新生成 `userData/workspace/app-settings.editing.json`；运行中的常规设置修改只写该工作副本，离开“常规”页面时选择保存、放弃或取消。保存时原子替换正式设置，放弃时用正式设置重新覆盖工作副本；上次异常退出遗留的草稿不会自动恢复。运行环境和关于是只读页面，日志选项即时保存。这些选项不写入文档样式配置。
+正式应用设置存放在 Electron `userData/app-settings.json`，默认值来自 `desktop/src/app-defaults.json`。
+每次启动都从正式设置重新生成 `userData/workspace/app-settings.editing.json`；
+
+运行中的常规设置修改只写该工作副本，离开“常规”页面时选择`保存`、``放弃``或`取消`。
+`保存`：工作副本替换正式设置；
+`放弃`：正式设置重新覆盖工作副本；
+上次异常退出遗留的`工作副本`自动被替换。
+
+运行环境和关于是只读页面，日志选项即时保存。这些选项不写入文档样式配置。
 
 ## 常规
 

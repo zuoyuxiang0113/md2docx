@@ -41,6 +41,7 @@ node_modules/
 runtime/pandoc/pandoc.exe
 
 # Editor and OS files
+# 编辑器与系统文件
 .idea/
 .vscode/
 *.swp
@@ -50,8 +51,14 @@ Thumbs.db
 Desktop.ini
 
 # Temporary conversion files
+# 临时转换文件
 *.tmp
 *.bak
 *.warnings.json
 *.docx
 
+# Development Planning and Logs
+# 开发规划与日志
+/docs/planning/
+/docs/project-review-2026-11-01.md
+/docs/release-checklist.md
