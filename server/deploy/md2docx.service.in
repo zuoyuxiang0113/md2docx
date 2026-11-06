@@ -1,0 +1,37 @@
+[Unit]
+Description=MD2DOCX conversion API
+After=network.target
+
+[Service]
+Type=simple
+User=@USER@
+Group=@GROUP@
+WorkingDirectory=@PROJECT@
+Environment=MD2DOCX_DATA_DIR=@DATA@
+Environment=MD2DOCX_SERVER_PYTHON=@PYTHON@
+EnvironmentFile=-/etc/md2docx/server.env
+ExecStart=@PYTHON@ -m server --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=@DATA@
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictSUIDSGID=true
+MemoryMax=768M
+MemorySwapMax=0
+CPUQuota=100%
+TasksMax=128
+LimitNOFILE=1024
+LimitCORE=0
+
+[Install]
+WantedBy=multi-user.target
