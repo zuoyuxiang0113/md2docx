@@ -1,9 +1,21 @@
 # MD2DOCX 服务器端
 
-在 Linux/WSL 上为现有转换核心增加 HTTP 接口。**免费、免登录，不申请长期 API Key。**
-代码集中在 `server/`，没有修改 `core/`、`cli/` 或桌面前端。
+在 Linux/WSL 上为现有转换核心提供在线转换网页和 HTTP 接口。**免费、免登录，不申请长期 API Key。**
+代码集中在 `server/`；网页从桌面版复制必要组件并独立维护，没有修改 `core/`、`cli/` 或桌面前端。
+
+- `server/web/`：浏览器页面、排版组件、前端依赖和构建。
+- `server/api/`：HTTP 路由；`server/app.py` 保留原入口兼容。
+- `server/docs/`：产品文案、迁移设计和虚拟机验收。
+- `server/scripts/`、`server/deploy/`：安装、构建、启动和服务模板。
+- 根目录其余 Python 模块：队列、持久化、配置校验和隔离执行。
+
+详细步骤：[网页版迁移与验收](docs/网页版迁移与验收.md)。
 
 ## 已实现
+
+- 浏览器首页 `/`：上传文件/文件夹、粘贴 Markdown、八类排版编辑、配置导入导出和浏览器命名保存。
+- 网页任务进度、取消、刷新恢复最近任务、下载与主动删除；不需要 Electron。
+- 本地 Swagger 静态资源，不依赖外部 CDN。
 
 - JSON Markdown 文本和 multipart Markdown/图片上传。
 - 单文件和批量任务；复用已有页面、字体、正文、六级标题、表格、引用、代码、图片、题注、公式及编号配置。
@@ -56,6 +68,8 @@ bash server/scripts/bootstrap.sh
 - 如环境不存在，创建 Conda `md2docx`，Python 3.14.7。
 - `requirements-lock.txt` 固定运行依赖，保留核心 python-docx 1.2.0、lxml 6.1.3。
 - Pandoc 安装到该 Conda 环境；官方 3.12.1 Linux 包经过固定 SHA-256 校验。
+- 完整 bootstrap 自动安装固定 Node.js 并构建网页，npm 使用锁定依赖和镜像；Node 只用于构建。
+- Conda 创建环境默认使用清华镜像；自动识别 miniconda/miniconda3。
 - 默认使用清华 HTTPS pip 镜像；可设置 `MD2DOCX_PIP_INDEX_URL`、`MD2DOCX_CONDA_EXE`、`MD2DOCX_SERVER_PYTHON`。
 - 不关闭 TLS 校验，不把代理地址或凭据写入仓库。
 - 不会自动执行 Git pull、覆盖已有部署、启用系统服务或公开端口；先验证再切换版本。

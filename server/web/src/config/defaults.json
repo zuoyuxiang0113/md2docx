@@ -1,0 +1,143 @@
+{
+  "schemaVersion": 2,
+  "id": "default",
+  "updatedAt": null,
+  "numbering": {
+    "enabled": true,
+    "stripExisting": true,
+    "startAt": 1
+  },
+  "page": {
+    "preset": "A4",
+    "orientation": "portrait",
+    "widthCm": 21,
+    "heightCm": 29.7,
+    "topMarginCm": 2.54,
+    "bottomMarginCm": 2.54,
+    "leftMarginCm": 3,
+    "rightMarginCm": 3
+  },
+  "styles": {
+    "normal": {
+      "eastAsia": "宋体",
+      "ascii": "Times New Roman",
+      "sizePt": 12,
+      "color": "000000",
+      "lineSpacing": 1.5,
+      "firstLineChars": 2,
+      "alignment": "left",
+      "spaceBeforePt": 0,
+      "spaceAfterPt": 0
+    },
+    "heading1": {
+      "eastAsia": "黑体",
+      "ascii": "Times New Roman",
+      "sizePt": 16,
+      "bold": true,
+      "italic": false,
+      "color": "000000",
+      "alignment": "left",
+      "spaceBeforePt": 18,
+      "spaceAfterPt": 8
+    },
+    "heading2": {
+      "eastAsia": "黑体",
+      "ascii": "Times New Roman",
+      "sizePt": 14,
+      "bold": true,
+      "color": "000000",
+      "alignment": "left",
+      "spaceBeforePt": 10,
+      "spaceAfterPt": 4,
+      "italic": false
+    },
+    "heading3": {
+      "eastAsia": "黑体",
+      "ascii": "Times New Roman",
+      "sizePt": 12,
+      "bold": true,
+      "color": "000000",
+      "alignment": "left",
+      "spaceBeforePt": 8,
+      "spaceAfterPt": 3,
+      "italic": false
+    },
+    "heading4": {
+      "eastAsia": "黑体",
+      "ascii": "Times New Roman",
+      "sizePt": 12,
+      "bold": true,
+      "color": "000000",
+      "alignment": "left",
+      "spaceBeforePt": 6,
+      "spaceAfterPt": 2,
+      "italic": false
+    },
+    "heading5": {
+      "eastAsia": "黑体",
+      "ascii": "Times New Roman",
+      "sizePt": 11,
+      "bold": true,
+      "color": "000000",
+      "alignment": "left",
+      "spaceBeforePt": 4,
+      "spaceAfterPt": 2,
+      "italic": false
+    },
+    "heading6": {
+      "eastAsia": "黑体",
+      "ascii": "Times New Roman",
+      "sizePt": 11,
+      "bold": true,
+      "color": "000000",
+      "alignment": "left",
+      "spaceBeforePt": 4,
+      "spaceAfterPt": 2,
+      "italic": false
+    },
+    "quote": {
+      "eastAsia": "宋体",
+      "ascii": "Times New Roman",
+      "sizePt": 11,
+      "italic": true,
+      "leftIndentCm": 0.74,
+      "color": "666666"
+    },
+    "codeBlock": {
+      "eastAsia": "Consolas",
+      "ascii": "Consolas",
+      "sizePt": 10,
+      "color": "333333",
+      "backgroundColor": "F5F6F6",
+      "wrap": true,
+      "showLanguage": false
+    },
+    "caption": {
+      "eastAsia": "宋体",
+      "ascii": "Times New Roman",
+      "sizePt": 10.5,
+      "color": "000000"
+    },
+    "table": {
+      "eastAsia": "宋体",
+      "ascii": "Times New Roman",
+      "sizePt": 10.5,
+      "color": "000000",
+      "headerBold": true,
+      "headerColor": "000000",
+      "threeLine": true,
+      "alignment": "center",
+      "cellPaddingPt": 4
+    }
+  },
+  "options": {
+    "math": "omml",
+    "mathFallback": "warning",
+    "images": {
+      "alignment": "center",
+      "maxWidthCm": 0,
+      "keepRatio": true,
+      "captionEnabled": true
+    }
+  }
+}

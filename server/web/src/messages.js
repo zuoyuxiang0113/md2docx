@@ -1,0 +1,5 @@
+// Labels copied from the desktop style editor; desktop-only menus are excluded.
+export default { zh: {
+  pageSettings: "页面", bodySettings: "正文", headingSettings: "标题", tableSettings: "表格", codeSettings: "代码块", imageSettings: "图片", mathSettings: "公式", numberingSettings: "编号",
+  numbering: "启用 Word 自动编号", size: "字号", color: "颜色", lineSpacing: "行距", firstIndent: "首行缩进", spaceBefore: "段前", spaceAfter: "段后", preset: "纸张", orientation: "方向", portrait: "纵向", landscape: "横向", width: "宽度", height: "高度", margin: "页边距", topMargin: "上", bottomMargin: "下", leftMargin: "左", rightMargin: "右", headerBold: "表头加粗", threeLine: "三线表", tableAlignment: "表格对齐", padding: "单元格内边距", background: "背景色", wrap: "自动换行", showLanguage: "显示语言", imageAlign: "图片对齐", maxWidth: "最大宽度", keepRatio: "保持比例", caption: "保留图注", mathFormat: "公式格式", fallback: "失败处理", stripNumbers: "去除已有编号", startAt: "起始级别", alignment: "对齐方式", left: "左对齐", center: "居中", right: "右对齐", justify: "两端对齐", bold: "加粗", italic: "斜体", sampleTitle: "示例标题", heading: n => `标题 ${n}`,
+} };

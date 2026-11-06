@@ -6,7 +6,12 @@ if [[ "$(uname -s)" != Linux || "$(uname -m)" != x86_64 ]]; then
   echo "Bootstrap currently supports Linux x86_64 only." >&2
   exit 2
 fi
-conda_bin=${MD2DOCX_CONDA_EXE:-"$HOME/miniconda3/bin/conda"}
+conda_bin=${MD2DOCX_CONDA_EXE:-${CONDA_EXE:-""}}
+if [[ -z "$conda_bin" ]]; then
+  for candidate in "$HOME/miniconda3/bin/conda" "$HOME/miniconda/bin/conda"; do
+    if [[ -x "$candidate" ]]; then conda_bin=$candidate; break; fi
+  done
+fi
 if [[ ! -x "$conda_bin" ]]; then
   echo "Install Linux Miniconda first, or set MD2DOCX_CONDA_EXE." >&2
   exit 2
@@ -16,7 +21,7 @@ if ! command -v bwrap >/dev/null; then
   exit 2
 fi
 if ! "$conda_bin" run -n md2docx python --version >/dev/null 2>&1; then
-  "$conda_bin" create -n md2docx python=3.14.7 pip -y
+  "$conda_bin" create -n md2docx --override-channels -c "${MD2DOCX_CONDA_CHANNEL:-https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main}" python=3.14.7 pip -y
 fi
 pip_index=${MD2DOCX_PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
 "$conda_bin" run --no-capture-output -n md2docx python -m pip install --index-url "$pip_index" --timeout 20 --retries 2 pip==26.2.2 setuptools==84.2.1 wheel==0.48.0
@@ -26,4 +31,6 @@ bash server/scripts/install-pandoc.sh "$prefix"
 "$conda_bin" run --no-capture-output -n md2docx python -m pip check
 "$conda_bin" run --no-capture-output -n md2docx python cli/md2docx.py doctor --json
 "$conda_bin" run --no-capture-output -n md2docx python -m server.check
+bash server/scripts/install-node.sh
+bash server/scripts/build-web.sh
 printf '\nEnvironment ready. Start locally: bash server/scripts/run.sh\n'

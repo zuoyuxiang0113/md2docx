@@ -31,6 +31,10 @@ Token 由服务自动生成，不需要用户注册、申请或付费。服务�
 
 会话 token 不放 URL，不写日志、不提交 Git。没有会话就无法恢复自己任务的访问；新建会话不能取得旧会话的任务。
 
+### GET /v1/sessions/current
+
+浏览器检查现有 Cookie 会话，成功 200，data 为 `{ "active": true }`；无会话/过期返回 401。不生成新会话，不返回 token。用于上传前复用已有任务归属。
+
 ## 2. 通用返回
 
 JSON 成功：`{success:true,data,requestId}`。
