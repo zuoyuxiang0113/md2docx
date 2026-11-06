@@ -1,0 +1,4 @@
+# Local environment reports and conversion smoke outputs.
+verification/
+*.resolved.txt
+*.resolved.yml

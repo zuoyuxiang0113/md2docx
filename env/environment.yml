@@ -1,0 +1,6 @@
+name: md2docx
+channels:
+  - defaults
+dependencies:
+  - python=3.14.7
+  - pip
