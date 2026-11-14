@@ -1,0 +1,10 @@
+flowchart TB
+    desk["桌面 React<br/>Electron 白名单 IPC"]
+    web["网页 React / Agent<br/>HTTP 上传与下载"]
+    local["本地 CLI<br/>用户电脑运行"]
+    remote["server API / Jobs<br/>Linux 隔离执行"]
+    core["共享 cli / core<br/>Pandoc + python-docx"]
+    desk --> local
+    web --> remote
+    local --> core
+    remote --> core

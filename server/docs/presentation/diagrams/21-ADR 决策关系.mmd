@@ -1,0 +1,14 @@
+flowchart TB
+    goal["目标：免费远程转换<br/>网页与 Agent 共用 API"]
+    core["ADR-001<br/>复用 CLI / core"]
+    web["ADR-002 / 006<br/>独立网页、同源访问"]
+    session["ADR-003<br/>自动匿名会话"]
+    isolate["ADR-004 / 005<br/>沙箱、串行、SQLite"]
+    prod["ADR-007 / 008<br/>TLS、systemd 待验收"]
+    future["ADR-009 / 010<br/>诊断、按指标拆分"]
+    goal --> core
+    goal --> web
+    goal --> session
+    core --> isolate
+    web --> prod
+    session --> future

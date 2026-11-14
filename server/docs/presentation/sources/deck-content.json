@@ -1,0 +1,1906 @@
+[
+  {
+    "number": 1,
+    "part": 1,
+    "title": "MD2DOCX 架构与部署演进",
+    "subtitle": "六人技术汇报  代码基线 a558df7  2026-11-06",
+    "kind": "cover",
+    "content": [
+      "01 系统现状与问题",
+      "02 模块依赖与 C4",
+      "03 数据流与故障影响",
+      "04 部署方案与成本",
+      "05 ADR 与推荐方案",
+      "06 分阶段升级与回退"
+    ],
+    "notes": "各位好，我们今天介绍 MD2DOCX 从本地软件扩展到在线服务的架构与部署演进。这次汇报由六个人完成，每人负责五页，每部分约六分钟。第一部分确认我们真正拥有的系统，第二部分解释模块与分层，第三部分跟踪一份文档及其故障路径，第四部分比较自有服务器、Cloudflare Workers 和 Containers，第五部分说明架构决策，第六部分给出升级与回退计划。所有现状以 a558df7 的代码为基线。图中会区分当前实现与未来目标，成本会区分官方单价和演算假设。特别需要说明，WSL 的样例转换成功并不等于目标虚拟机已经验收，当前 prompt.md 转换失败仍然没有根因结论。我们希望这次汇报帮助团队作出可执行的选择，而不是仅仅展示几张漂亮的架构图。\n\n【来源】代码基线 a558df7；资料查询日期 2026-11-06。\nserver/docs/架构梳理-C4.md\nserver/docs/分阶段升级路线.md\n【演讲提示】按页面图示顺序讲解，最后留约 10 秒解释一个具体例子或完成交接。",
+    "refs": [
+      "server/docs/架构梳理-C4.md",
+      "server/docs/分阶段升级路线.md"
+    ],
+    "seconds": 75
+  },
+  {
+    "number": 2,
+    "part": 1,
+    "title": "同一仓库里有三条产品链路",
+    "subtitle": "下载官网、桌面软件和在线转换各有入口",
+    "kind": "table",
+    "content": [
+      [
+        "链路",
+        "入口与运行方式",
+        "转换发生在哪里"
+      ],
+      [
+        "下载官网",
+        "website/ + worker.js",
+        "不执行转换"
+      ],
+      [
+        "桌面软件",
+        "desktop/ React + Electron",
+        "用户电脑的 CLI / core"
+      ],
+      [
+        "在线服务",
+        "server/web + FastAPI",
+        "Linux 沙箱内的 CLI / core"
+      ],
+      [
+        "Agent 接入",
+        "HTTP 契约已实现",
+        "服务端；平台 Skill 尚待适配"
+      ]
+    ],
+    "notes": "首先澄清系统边界。第一条链路是已有下载官网，Cloudflare Worker 的代码只有 env.ASSETS.fetch，它负责返回 website 目录的静态内容，没有调用转换 API。第二条链路是桌面软件，用户界面由 React 编写，Electron 处理文件对话框和白名单 IPC，再启动本地 CLI，所以离线转换能力仍然存在。第三条链路才是本次新增的在线服务，它把网页文件放在 server/web，通过 FastAPI 上传文件，在 Linux 的隔离子进程里转换。Agent 可以使用同一 HTTP 契约，但首批平台的附件上传能力和 Skill 发布还没有完成。因此，不能因为仓库里有 wrangler.toml 就认为转换服务已经部署到 Cloudflare，也不能把 HTTP 接口可调用等同于所有 Agent 平台都已经适配。区分这三条链路，后面的依赖图和费用比较才不会混淆。\n\n【来源】代码基线 a558df7；资料查询日期 2026-11-06。\nworker.js\nwrangler.toml\n.github/workflows/deploy-website.yml\ndesktop/src/main.cjs\nserver/web/src/api.js\n【演讲提示】按页面图示顺序讲解，最后留约 10 秒解释一个具体例子或完成交接。",
+    "refs": [
+      "worker.js",
+      "wrangler.toml",
+      ".github/workflows/deploy-website.yml",
+      "desktop/src/main.cjs",
+      "server/web/src/api.js"
+    ],
+    "seconds": 75
+  },
+  {
+    "number": 3,
+    "part": 1,
+    "title": "当前证据支持到哪一步",
+    "subtitle": "功能验证、环境验收和生产可用性分别判断",
+    "kind": "table",
+    "content": [
+      [
+        "项目",
+        "已有证据",
+        "当前结论"
+      ],
+      [
+        "WSL 自动化",
+        "后端 33 项、前端 3 项通过",
+        "局部功能与回归通过"
+      ],
+      [
+        "WSL 浏览器",
+        "上传、批量、图片、下载成功",
+        "示例链路跑通"
+      ],
+      [
+        "VMware 网络",
+        "Windows 访问首页、readyz 200",
+        "网络与探测通过"
+      ],
+      [
+        "VMware 转换",
+        "prompt.md\nCONVERTER_FAILED",
+        "根因未定，阻断验收"
+      ],
+      [
+        "公网与容量",
+        "TLS、真实 IP、2 核 2G 未验收",
+        "不能宣称生产就绪"
+      ]
+    ],
+    "notes": "这一页说明证据的层次。前一轮开发里，我们在 WSL 跑过三十三项后端测试和三项前端测试，也用 Windows 浏览器实际上传两份 Markdown 和图片，再下载生成的 DOCX。这些证据支持样例功能可以工作。虚拟机这边，Windows 能连接端口，健康和就绪接口都返回二百，首页也已经打开，但用户上传的 prompt.md 仍返回转换进程失败。这里不能推断一定是文档问题，也不能因为 readyz 成功就排除运行环境问题，因为探测过程没有完整经过真实任务的资源限制链。公网的 TLS、可信代理和实际容量也没有验收。我们把这些事实分开，是为了让成功记录与失败记录同时保留。后续发布门槛应当以目标机器上的真实转换成功为准，而不是只看页面是否加载出来。\n\n【来源】代码基线 a558df7；资料查询日期 2026-11-06。\nserver/tests/test_server.py\nserver/tests/test_web.py\nserver/web/tests/api.test.js\nserver/runner.py:Sandbox.probe\n会话中的 VMware 失败截图\n【演讲提示】按页面图示顺序讲解，最后留约 10 秒解释一个具体例子或完成交接。",
+    "refs": [
+      "server/tests/test_server.py",
+      "server/tests/test_web.py",
+      "server/web/tests/api.test.js",
+      "server/runner.py:Sandbox.probe",
+      "会话中的 VMware 失败截图"
+    ],
+    "seconds": 80
+  },
+  {
+    "number": 4,
+    "part": 1,
+    "title": "转换核心服务于两个客户端",
+    "subtitle": "复用结果能力，分别维护文件与通信适配",
+    "kind": "diagram",
+    "content": {
+      "nodes": [
+        {
+          "id": "desk",
+          "text": "桌面 React\nElectron 白名单 IPC",
+          "x": 75,
+          "y": 220,
+          "w": 260,
+          "h": 100,
+          "role": "normal"
+        },
+        {
+          "id": "web",
+          "text": "网页 React / Agent\nHTTP 上传与下载",
+          "x": 75,
+          "y": 410,
+          "w": 260,
+          "h": 100,
+          "role": "normal"
+        },
+        {
+          "id": "local",
+          "text": "本地 CLI\n用户电脑运行",
+          "x": 470,
+          "y": 220,
+          "w": 260,
+          "h": 100,
+          "role": "normal"
+        },
+        {
+          "id": "remote",
+          "text": "server API / Jobs\nLinux 隔离执行",
+          "x": 470,
+          "y": 410,
+          "w": 260,
+          "h": 100,
+          "role": "normal"
+        },
+        {
+          "id": "core",
+          "text": "共享 cli / core\nPandoc + python-docx",
+          "x": 890,
+          "y": 315,
+          "w": 290,
+          "h": 115,
+          "role": "primary"
+        }
+      ],
+      "edges": [
+        [
+          "desk",
+          "local"
+        ],
+        [
+          "web",
+          "remote"
+        ],
+        [
+          "local",
+          "core"
+        ],
+        [
+          "remote",
+          "core"
+        ]
+      ],
+      "caption": "前端必要组件复制到 server/web；转换引擎继续复用原源码"
+    },
+    "notes": "从功能上看，桌面版和在线版共享的是转换能力，而不是同一个文件操作环境。桌面版能够拿到用户本地路径，Electron 用白名单桥接到 CLI。浏览器受到沙箱限制，只能通过用户选择得到 File 对象，服务器也不能根据一个 Windows 路径直接读取客户电脑。因此在线版必须改成上传字节、提交任务、查询状态和下载文件。用户明确要求网页副本放到 server 下，所以我们复制了必要的样式编辑器、CSS 和默认配置，独立构建，没有反向修改 desktop。它的好处是迁移范围清晰，桌面安装链不增加网页依赖。代价是将来编辑器修复和配置协议升级时要主动同步两个副本。转换引擎则继续使用已有 cli 和 core，避免重写后出现排版结果漂移。这是复用边界最重要的一项取舍。\n\n【来源】代码基线 a558df7；资料查询日期 2026-11-06。\ndesktop/src/preload.cjs\ndesktop/src/main.cjs\nserver/web/src/components/StyleEditor.jsx\nserver/runner.py\ncore/md2docx_core.py\n【演讲提示】按页面图示顺序讲解，最后留约 10 秒解释一个具体例子或完成交接。",
+    "refs": [
+      "desktop/src/preload.cjs",
+      "desktop/src/main.cjs",
+      "server/web/src/components/StyleEditor.jsx",
+      "server/runner.py",
+      "core/md2docx_core.py"
+    ],
+    "seconds": 75
+  },
+  {
+    "number": 5,
+    "part": 1,
+    "title": "当前阻塞：转换进程缺少诊断",
+    "subtitle": "CONVERTER_FAILED 不是“编号清理导致失败”的证据",
+    "kind": "points",
+    "content": [
+      [
+        "已知",
+        "服务收到任务，任务最终失败"
+      ],
+      [
+        "未知",
+        "进程启动、环境、安全策略或文档内容哪一项导致"
+      ],
+      [
+        "代码原因",
+        "stdout 无法解析为 JSON 时返回通用错误"
+      ],
+      [
+        "优先处理",
+        "最小文档复现，记录退出码与受控诊断"
+      ]
+    ],
+    "notes": "第一部分最后聚焦当前最具体的故障。截图里有两条信息，一条是 CONVERTER_FAILED，另一条是编号清理风险警告。它们不能被直接连接成因果关系。runner 在无法把标准输出解析成 JSON 时返回通用失败，这意味着转换进程可能没有正常启动，也可能在输出结果前异常退出。与此同时，编号警告来自配置，在任务开始前就可能生成，它只说明标题数字存在被删除的风险。正确定位顺序是先用最小 Markdown 对照，再检查 doctor、基础沙箱探测和带 limit_exec 的真实转换。诊断记录应限字节、限时，并只对管理员开放，不能把原文、主机路径或凭证直接返回给网页。这个问题也说明，增加界面之后必须补齐运行诊断。接下来第二位同学会从模块和 C4 层次解释，这些诊断分别属于哪一层。\n\n【来源】代码基线 a558df7；资料查询日期 2026-11-06。\nserver/runner.py:Sandbox._execute\nserver/jobs.py:failure\nserver/validation.py:effective_config\n【演讲提示】按页面图示顺序讲解，最后留约 10 秒解释一个具体例子或完成交接。",
+    "refs": [
+      "server/runner.py:Sandbox._execute",
+      "server/jobs.py:failure",
+      "server/validation.py:effective_config"
+    ],
+    "seconds": 80
+  },
+  {
+    "number": 6,
+    "part": 2,
+    "title": "C4 第一级：系统上下文",
+    "subtitle": "谁使用系统，谁维护系统，哪些系统在边界之外",
+    "kind": "diagram",
+    "content": {
+      "nodes": [
+        {
+          "id": "user",
+          "text": "普通用户\n浏览器",
+          "x": 75,
+          "y": 225,
+          "w": 260,
+          "h": 100,
+          "role": "normal"
+        },
+        {
+          "id": "agent",
+          "text": "Agent 平台\nHTTP 与附件能力",
+          "x": 75,
+          "y": 435,
+          "w": 260,
+          "h": 100,
+          "role": "normal"
+        },
+        {
+          "id": "sys",
+          "text": "在线转换系统\n网页 + API + 执行",
+          "x": 490,
+          "y": 310,
+          "w": 310,
+          "h": 125,
+          "role": "primary"
+        },
+        {
+          "id": "admin",
+          "text": "维护者\nWSL 开发与发布",
+          "x": 930,
+          "y": 225,
+          "w": 260,
+          "h": 100,
+          "role": "normal"
+        },
+        {
+          "id": "git",
+          "text": "GitHub\n源码与版本",
+          "x": 930,
+          "y": 435,
+          "w": 260,
+          "h": 100,
+          "role": "normal"
+        }
+      ],
+      "edges": [
+        [
+          "user",
+          "sys"
+        ],
+        [
+          "agent",
+          "sys"
+        ],
+        [
+          "admin",
+          "sys"
+        ],
+        [
+          "git",
+          "sys"
+        ]
+      ],
+      "caption": "GitHub 属于构建与更新链路；运行时不上传文稿到 GitHub"
+    },
+    "notes": "第二部分从 C4 的第一级开始。这里先不讨论具体框架，而是确定谁在系统之外。普通用户通过浏览器上传和下载，Agent 通过 HTTP 与附件机制使用相同服务。维护者负责在 WSL 开发以及在服务器发布，GitHub 保存源码和版本。这张图没有把 GitHub 画成每次转换的在线依赖，因为服务器部署好以后并不需要请求 GitHub 才能生成 Word。桌面软件是独立客户端产品，也不要求连接这个在线系统。匿名不表示任务公开，浏览器 Cookie 或 Agent 临时 Bearer 会话仍然限制任务归属。图中的访问线说明交互方向，不等于所有外部网络都可信。实际生产入口需要 HTTPS，这在当前虚拟机验证里还没有配置。C4 上下文图的价值，就是让团队先对系统责任和外部参与者形成一致认识，再进入内部结构。\n\n【来源】代码基线 a558df7；资料查询日期 2026-11-06。\nserver/API.md\nserver/api/app.py\nserver/docs/架构梳理-C4.md\n【演讲提示】按页面图示顺序讲解，最后留约 10 秒解释一个具体例子或完成交接。",
+    "refs": [
+      "server/API.md",
+      "server/api/app.py",
+      "server/docs/架构梳理-C4.md"
+    ],
+    "seconds": 75
+  },
+  {
+    "number": 7,
+    "part": 2,
+    "title": "C4 第二级：运行与存储单元",
+    "subtitle": "执行器是 API 进程内循环，不是独立 Worker 服务",
+    "kind": "diagram",
+    "content": {
+      "nodes": [
+        {
+          "id": "client",
+          "text": "浏览器 / Agent",
+          "x": 70,
+          "y": 210,
+          "w": 230,
+          "h": 85,
+          "role": "normal"
+        },
+        {
+          "id": "api",
+          "text": "Uvicorn / FastAPI\n单 Python 进程",
+          "x": 415,
+          "y": 210,
+          "w": 270,
+          "h": 100,
+          "role": "primary"
+        },
+        {
+          "id": "queue",
+          "text": "Jobs 异步循环\n同进程、串行执行",
+          "x": 415,
+          "y": 405,
+          "w": 270,
+          "h": 100,
+          "role": "normal"
+        },
+        {
+          "id": "db",
+          "text": "SQLite WAL\n任务 / 会话 / 幂等",
+          "x": 840,
+          "y": 210,
+          "w": 330,
+          "h": 95,
+          "role": "normal"
+        },
+        {
+          "id": "fs",
+          "text": "私有工作区\n输入 / 配置 / DOCX",
+          "x": 840,
+          "y": 405,
+          "w": 330,
+          "h": 95,
+          "role": "normal"
+        },
+        {
+          "id": "sandbox",
+          "text": "Bubblewrap 子进程\nCLI 与 Pandoc",
+          "x": 415,
+          "y": 560,
+          "w": 270,
+          "h": 80,
+          "role": "normal"
+        }
+      ],
+      "edges": [
+        [
+          "client",
+          "api"
+        ],
+        [
+          "api",
+          "db"
+        ],
+        [
+          "api",
+          "fs"
+        ],
+        [
+          "api",
+          "queue"
+        ],
+        [
+          "queue",
+          "sandbox"
+        ],
+        [
+          "sandbox",
+          "fs"
+        ]
+      ],
+      "caption": "生产目标增加 HTTPS 入口；Node 仅参与网页构建，不常驻服务"
+    },
+    "notes": "第二级把系统分成实际运行和存储单元。FastAPI 与 Uvicorn 是一个 Python 进程，Jobs 是在它的生命周期内创建的异步循环，所以 API 与执行器共享故障域。它们不是两个已经独立部署的服务。状态保存在 SQLite，文稿字节和结果放在私有工作区。转换时才启动 Bubblewrap 子进程，里面运行 CLI、Pandoc 和样式后处理。网页的 React 运行在用户浏览器，构建后的静态文件由 Python 返回，Node 只在构建期间使用。图中的 C4 容器指可运行或存储单元，不能理解为每个方框都对应 Docker。当前同一数据目录使用文件锁，只允许一个服务实例。也正因为这个约束，不能简单增加 Uvicorn workers 实现扩容。未来如果拆独立 Worker，需要先定义跨进程任务领取和租约协议。\n\n【来源】代码基线 a558df7；资料查询日期 2026-11-06。\nserver/api/app.py:create_app\nserver/jobs.py:Jobs.start\nserver/__main__.py\nserver/store.py\nserver/scripts/build-web.sh\n【演讲提示】按页面图示顺序讲解，最后留约 10 秒解释一个具体例子或完成交接。",
+    "refs": [
+      "server/api/app.py:create_app",
+      "server/jobs.py:Jobs.start",
+      "server/__main__.py",
+      "server/store.py",
+      "server/scripts/build-web.sh"
+    ],
+    "seconds": 80
+  },
+  {
+    "number": 8,
+    "part": 2,
+    "title": "C4 第三级：服务组件",
+    "subtitle": "入口校验、任务生命周期与隔离执行各自负责一类约束",
+    "kind": "diagram",
+    "content": {
+      "nodes": [
+        {
+          "id": "guard",
+          "text": "Guard / CORS\n字节、来源、限流",
+          "x": 70,
+          "y": 230,
+          "w": 260,
+          "h": 100,
+          "role": "normal"
+        },
+        {
+          "id": "route",
+          "text": "API Routes\n会话 / 任务 / 下载",
+          "x": 440,
+          "y": 230,
+          "w": 280,
+          "h": 100,
+          "role": "primary"
+        },
+        {
+          "id": "valid",
+          "text": "Models / Validation\n清单、配置、图片",
+          "x": 870,
+          "y": 230,
+          "w": 300,
+          "h": 100,
+          "role": "normal"
+        },
+        {
+          "id": "store",
+          "text": "Store\nSQLite 与归属校验",
+          "x": 70,
+          "y": 460,
+          "w": 260,
+          "h": 100,
+          "role": "normal"
+        },
+        {
+          "id": "jobs",
+          "text": "Jobs\n状态、取消、清理",
+          "x": 440,
+          "y": 460,
+          "w": 280,
+          "h": 100,
+          "role": "normal"
+        },
+        {
+          "id": "run",
+          "text": "Sandbox / limit_exec\n执行与资源限制",
+          "x": 870,
+          "y": 460,
+          "w": 300,
+          "h": 100,
+          "role": "normal"
+        }
+      ],
+      "edges": [
+        [
+          "guard",
+          "route"
+        ],
+        [
+          "route",
+          "valid"
+        ],
+        [
+          "route",
+          "store"
+        ],
+        [
+          "route",
+          "jobs"
+        ],
+        [
+          "jobs",
+          "store"
+        ],
+        [
+          "jobs",
+          "run"
+        ]
+      ],
+      "caption": "浏览器预检只改善体验；服务端校验仍是最终边界"
+    },
+    "notes": "组件图进一步说明责任分配。Guard 在解析复杂请求之前处理体积预算、上传并发、来源与请求频率。路由组织会话、配置、任务与下载操作。Models 和 Validation 检查清单、相对路径、配置白名单及图片，浏览器的同类检查不能替代它。Store 处理 SQLite 持久化、会话哈希、幂等和任务归属。Jobs 管理排队、运行、取消和清理，Runner 负责受限子进程。这个分层主要是为了把业务状态和危险执行隔开，而不是追求层数多。实际代码里路由文件仍然承担了较多上传流程，后续可以拆出输入接收服务，但应保持接口契约不变。还有一个细节，图片解码发生在请求受理阶段，并使用单独隔离进程，它可能与已有文档转换重叠，所以不能仅凭转换串行就推导整个服务只会有一个计算任务。\n\n【来源】代码基线 a558df7；资料查询日期 2026-11-06。\nserver/api/app.py:Guard\nserver/models.py\nserver/validation.py\nserver/jobs.py\nserver/runner.py\n【演讲提示】按页面图示顺序讲解，最后留约 10 秒解释一个具体例子或完成交接。",
+    "refs": [
+      "server/api/app.py:Guard",
+      "server/models.py",
+      "server/validation.py",
+      "server/jobs.py",
+      "server/runner.py"
+    ],
+    "seconds": 75
+  },
+  {
+    "number": 9,
+    "part": 2,
+    "title": "C4 第四级：关键代码依赖",
+    "subtitle": "只展示关键协作，不为每个函数制造一层架构",
+    "kind": "diagram",
+    "content": {
+      "nodes": [
+        {
+          "id": "ui",
+          "text": "App.jsx\n界面与任务交互",
+          "x": 70,
+          "y": 245,
+          "w": 260,
+          "h": 100,
+          "role": "normal"
+        },
+        {
+          "id": "http",
+          "text": "api.js\nfetch / FormData",
+          "x": 440,
+          "y": 245,
+          "w": 260,
+          "h": 100,
+          "role": "normal"
+        },
+        {
+          "id": "api",
+          "text": "api/app.py\ncreate_job()",
+          "x": 870,
+          "y": 245,
+          "w": 300,
+          "h": 100,
+          "role": "primary"
+        },
+        {
+          "id": "cli",
+          "text": "cli/md2docx.py\nCLI 契约",
+          "x": 70,
+          "y": 470,
+          "w": 260,
+          "h": 100,
+          "role": "normal"
+        },
+        {
+          "id": "runner",
+          "text": "Jobs.execute()\nSandbox.run()",
+          "x": 440,
+          "y": 470,
+          "w": 260,
+          "h": 100,
+          "role": "normal"
+        },
+        {
+          "id": "core",
+          "text": "core 转换函数\nPandoc / OOXML",
+          "x": 870,
+          "y": 470,
+          "w": 300,
+          "h": 100,
+          "role": "normal"
+        }
+      ],
+      "edges": [
+        [
+          "ui",
+          "http"
+        ],
+        [
+          "http",
+          "api"
+        ],
+        [
+          "api",
+          "runner"
+        ],
+        [
+          "runner",
+          "cli"
+        ],
+        [
+          "cli",
+          "core"
+        ]
+      ],
+      "caption": "server/app.py 保留兼容入口；代码级箭头表示调用依赖"
+    },
+    "notes": "到第四级，我们选择关键运行协作而不是完整类图。网页 App 负责用户交互，api.js 把 File 对象组织成 multipart 清单，调用相对的 /v1 路径。路由 create_job 形成有效配置并保存输入，Jobs.execute 再调用 Sandbox.run。沙箱启动已有的 CLI，CLI 调用核心完成 Pandoc 转换和 OOXML 排版。server/app.py 现在只是兼容导出，真正 HTTP 实现在 server/api/app.py。这里有两种容易误读的箭头：HTTP 调用跨越网络，Python 模块导入和子进程启动则是不同形式的依赖，讲解时应说清。后续修改 API 文案不应触碰 core，添加新的 Agent 客户端也应优先复用契约。相反，新增一种真正的转换格式通常需要扩展核心、输入验证和产物校验，不能只在前端增加一个下拉框。\n\n【来源】代码基线 a558df7；资料查询日期 2026-11-06。\nserver/web/src/App.jsx\nserver/web/src/api.js\nserver/api/app.py:create_job\nserver/jobs.py:Jobs.execute\nserver/runner.py:Sandbox.run\ncli/md2docx.py\n【演讲提示】按页面图示顺序讲解，最后留约 10 秒解释一个具体例子或完成交接。",
+    "refs": [
+      "server/web/src/App.jsx",
+      "server/web/src/api.js",
+      "server/api/app.py:create_job",
+      "server/jobs.py:Jobs.execute",
+      "server/runner.py:Sandbox.run",
+      "cli/md2docx.py"
+    ],
+    "seconds": 75
+  },
+  {
+    "number": 10,
+    "part": 2,
+    "title": "代码与文档的差异",
+    "subtitle": "本次核对后同步补充架构文档，不改业务代码",
+    "kind": "table",
+    "content": [
+      [
+        "旧表述或易误解点",
+        "代码事实",
+        "文档处理"
+      ],
+      [
+        "架构只描述桌面 / CLI",
+        "已增加在线网页与服务",
+        "补充在线链路与状态边界"
+      ],
+      [
+        "仓库有 Cloudflare 配置",
+        "只部署 website 静态官网",
+        "单独标记为下载官网"
+      ],
+      [
+        "readyz 通过即转换可用",
+        "未覆盖完整受限任务",
+        "增加探测与验收区别"
+      ],
+      [
+        "可直接滚动升级",
+        "单实例文件锁，共用 SQLite",
+        "先排空重启，再演进"
+      ],
+      [
+        "部署手册链接",
+        "引用了尚不存在的文件",
+        "改为现有 README 与验收文档"
+      ]
+    ],
+    "notes": "这一页记录反向工程的产出。旧的 architecture 文档准确描述了桌面路径，但没有覆盖新在线服务，所以需要补充而不是删除历史内容。Cloudflare 的配置只关联 website 静态官网，这一点也要写进文档，防止维护者以为修改 server 会自动触发云端部署。readyz 只是探测隔离运行环境，不覆盖完整受限转换，必须在验收要求中纠正。现有单实例锁和同机 SQLite 也限制了滚动发布，文档不应提前承诺不停机。我们还发现已有材料引用了并不存在的部署手册，将链接改为真实的 README 和验收说明。AI 从代码画图之后，仍然需要维护者逐条审核节点、边、状态和假设。本次完成的是代码与文档交叉核对，最终人工签核仍留给团队，不能把 AI 自动生成图叫作已经完成人工审查。下面第三部分将沿一份文档继续追踪。\n\n【来源】代码基线 a558df7；资料查询日期 2026-11-06。\ndocs/architecture.md\nworker.js\n.github/workflows/deploy-website.yml\nserver/runner.py\nserver/docs/架构梳理-C4.md\n【演讲提示】按页面图示顺序讲解，最后留约 10 秒解释一个具体例子或完成交接。",
+    "refs": [
+      "docs/architecture.md",
+      "worker.js",
+      ".github/workflows/deploy-website.yml",
+      "server/runner.py",
+      "server/docs/架构梳理-C4.md"
+    ],
+    "seconds": 80
+  },
+  {
+    "number": 11,
+    "part": 3,
+    "title": "一次转换的完整流程",
+    "subtitle": "202 表示任务已受理，不能等同于转换成功",
+    "kind": "diagram",
+    "content": {
+      "nodes": [
+        {
+          "id": "input",
+          "text": "选择文件 / 粘贴文本\n检查临时会话",
+          "x": 70,
+          "y": 220,
+          "w": 290,
+          "h": 95,
+          "role": "normal"
+        },
+        {
+          "id": "check",
+          "text": "POST /v1/jobs\n校验与图片隔离检查",
+          "x": 480,
+          "y": 220,
+          "w": 300,
+          "h": 95,
+          "role": "primary"
+        },
+        {
+          "id": "save",
+          "text": "私有工作区 + SQLite\n保存 queued，返回 202",
+          "x": 890,
+          "y": 220,
+          "w": 300,
+          "h": 95,
+          "role": "normal"
+        },
+        {
+          "id": "result",
+          "text": "查询状态 / 鉴权下载\n校验文件并保存",
+          "x": 70,
+          "y": 445,
+          "w": 290,
+          "h": 105,
+          "role": "normal"
+        },
+        {
+          "id": "clean",
+          "text": "验产物 / 终态入库\n清理输入与配置",
+          "x": 480,
+          "y": 445,
+          "w": 300,
+          "h": 105,
+          "role": "normal"
+        },
+        {
+          "id": "exec",
+          "text": "Jobs 领取任务\n沙箱 CLI 转换",
+          "x": 890,
+          "y": 445,
+          "w": 300,
+          "h": 105,
+          "role": "normal"
+        }
+      ],
+      "edges": [
+        [
+          "input",
+          "check"
+        ],
+        [
+          "check",
+          "save"
+        ],
+        [
+          "save",
+          "exec"
+        ],
+        [
+          "exec",
+          "clean"
+        ],
+        [
+          "clean",
+          "result"
+        ]
+      ],
+      "caption": "失败、取消和超时走终态分支；已有成功项仍可下载"
+    },
+    "notes": "第三部分用一份文档说明完整流程。浏览器先读取文件，必要时创建临时会话，然后带幂等键提交任务。服务端检查清单、配置、字节预算和图片，再写入工作区与 SQLite。此时返回二零二，含义只是任务已经受理。内部执行循环取到 queued 任务后才开始运行 CLI，阶段变化持续保存，浏览器定时查询。转换结束后，服务会检查结果是不是符合约束的 DOCX，计算大小和摘要，再保存终态并清理输入。用户最后通过归属校验下载，浏览器还检查下载字节数，在支持的安全上下文中校验 SHA-256。流程里每个成功的含义都不同：上传成功、查询成功、转换成功和本地保存成功不能混为一谈。如果批量任务中有部分成功，失败不会抹掉此前的有效产物。后面的状态与清理规则必须围绕这些区分设计。\n\n【来源】代码基线 a558df7；资料查询日期 2026-11-06。\nserver/web/src/api.js\nserver/api/app.py:create_job\nserver/jobs.py:Jobs.execute\nserver/api/app.py:download\n【演讲提示】按页面图示顺序讲解，最后留约 10 秒解释一个具体例子或完成交接。",
+    "refs": [
+      "server/web/src/api.js",
+      "server/api/app.py:create_job",
+      "server/jobs.py:Jobs.execute",
+      "server/api/app.py:download"
+    ],
+    "seconds": 75
+  },
+  {
+    "number": 12,
+    "part": 3,
+    "title": "从入口到落库的写入顺序",
+    "subtitle": "文件系统与 SQLite 分别持久化，不是跨介质事务",
+    "kind": "diagram",
+    "content": {
+      "nodes": [
+        {
+          "id": "mem",
+          "text": "请求体进入内存\nGuard 有字节上限",
+          "x": 65,
+          "y": 215,
+          "w": 270,
+          "h": 95,
+          "role": "normal"
+        },
+        {
+          "id": "stage",
+          "text": "staging 临时目录\n写输入与 config",
+          "x": 475,
+          "y": 215,
+          "w": 300,
+          "h": 95,
+          "role": "normal"
+        },
+        {
+          "id": "verify",
+          "text": "隔离验证图片\n重新检查幂等",
+          "x": 900,
+          "y": 215,
+          "w": 300,
+          "h": 95,
+          "role": "normal"
+        },
+        {
+          "id": "db",
+          "text": "SQLite 事务提交\njobs + session 续期",
+          "x": 65,
+          "y": 445,
+          "w": 270,
+          "h": 105,
+          "role": "primary"
+        },
+        {
+          "id": "rename",
+          "text": "rename 到 jobs/jobId\n同文件系统目录切换",
+          "x": 475,
+          "y": 445,
+          "w": 300,
+          "h": 105,
+          "role": "normal"
+        },
+        {
+          "id": "ready",
+          "text": "检查资源预算\n准备有效任务对象",
+          "x": 900,
+          "y": 445,
+          "w": 300,
+          "h": 105,
+          "role": "normal"
+        }
+      ],
+      "edges": [
+        [
+          "mem",
+          "stage"
+        ],
+        [
+          "stage",
+          "verify"
+        ],
+        [
+          "verify",
+          "ready"
+        ],
+        [
+          "ready",
+          "rename"
+        ],
+        [
+          "rename",
+          "db"
+        ]
+      ],
+      "caption": "崩溃窗口靠启动扫描处理无主目录；运行中任务重启后标失败"
+    },
+    "notes": "这一页专门解释落库，因为文件与数据库的顺序影响恢复。Guard 先在内存里收集有界请求体，路由解析后在 staging 写 Markdown、图片和配置。图片验证通过之后会再次检查幂等，因为异步等待期间可能有相同请求进入。接下来把目录 rename 到正式 jobs 路径，再通过 Store.insert 的事务保存任务和会话续期。目录 rename 在同一文件系统内具有原子性，但它与 SQLite 提交不是同一事务。如果进程在两者之间崩溃，可能留下没有数据库引用的目录。启动逻辑会扫描并清理无主目录，也会把上次 running 或 cancelling 的任务标成重启失败。这里不能宣称实现了任意崩溃点无损续跑。后续拆 Worker 时，需要把领取、文件可见性和恢复协议设计清楚，而不仅仅换一个数据库。\n\n【来源】代码基线 a558df7；资料查询日期 2026-11-06。\nserver/api/app.py:create_job\nserver/store.py:Store.insert\nserver/jobs.py:Jobs.start\n【演讲提示】按页面图示顺序讲解，最后留约 10 秒解释一个具体例子或完成交接。",
+    "refs": [
+      "server/api/app.py:create_job",
+      "server/store.py:Store.insert",
+      "server/jobs.py:Jobs.start"
+    ],
+    "seconds": 80
+  },
+  {
+    "number": 13,
+    "part": 3,
+    "title": "数据生命周期与访问边界",
+    "subtitle": "正文不落 SQLite，元数据和结果的期限不同",
+    "kind": "table",
+    "content": [
+      [
+        "数据",
+        "保存位置",
+        "清理与访问"
+      ],
+      [
+        "临时会话",
+        "客户端 token，SQLite 哈希",
+        "默认 48h；归属验证"
+      ],
+      [
+        "正文 / 图片 / 配置",
+        "私有任务目录",
+        "终态清理；异常清理须验证"
+      ],
+      [
+        "DOCX 结果",
+        "私有 outputs",
+        "默认 24h，可主动删除"
+      ],
+      [
+        "任务元数据",
+        "SQLite jobs.payload",
+        "清理为墓碑后再保留约 24h"
+      ],
+      [
+        "配置 / 最近任务 ID",
+        "浏览器 localStorage",
+        "无正文；本机保存、无跨设备同步"
+      ]
+    ],
+    "notes": "文档的数据有不同生命周期。会话 token 在客户端，服务只保存哈希，默认有效期四十八小时，提交任务会延长服务端访问期。Markdown、图片和有效配置在任务私有目录里，进入终态后执行清理。DOCX 默认保留二十四小时，用户也能主动删除。SQLite 保存状态、原始文件名等必要元数据以及摘要，不保存正文和 token 明文。删除或过期时会把任务改成小型墓碑，之后按清理规则再保留约二十四小时，用于拒绝旧幂等请求重放。浏览器只记配置和最近任务 ID，不持久保存未上传文本。这里还有一个必须诚实说明的限制：部分文件清理调用忽略错误，不能仅凭逻辑终态保证所有字节已经物理删除，备份也可能延长实际保留。因此需要清理滞后指标和失败告警，并为备份单独制定期限。\n\n【来源】代码基线 a558df7；资料查询日期 2026-11-06。\nserver/store.py:Store.expire\nserver/store.py:Store.prune\nserver/jobs.py:Jobs.finish\nserver/settings.py\nserver/web/src/App.jsx\n【演讲提示】按页面图示顺序讲解，最后留约 10 秒解释一个具体例子或完成交接。",
+    "refs": [
+      "server/store.py:Store.expire",
+      "server/store.py:Store.prune",
+      "server/jobs.py:Jobs.finish",
+      "server/settings.py",
+      "server/web/src/App.jsx"
+    ],
+    "seconds": 75
+  },
+  {
+    "number": 14,
+    "part": 3,
+    "title": "外部依赖按阶段区分",
+    "subtitle": "运行时不需要 GitHub，也不联网抓取 Markdown 图片",
+    "kind": "table",
+    "content": [
+      [
+        "阶段",
+        "依赖",
+        "不可用时的影响"
+      ],
+      [
+        "安装 / 更新",
+        "GitHub / Conda / PyPI / npm\nNode / Pandoc 下载",
+        "新部署受阻，旧版本可继续运行"
+      ],
+      [
+        "在线入口",
+        "DNS / TLS / 可选代理或 Cloudflare",
+        "访问失败，后端可能仍健康"
+      ],
+      [
+        "转换运行",
+        "本机 Pandoc、python-docx、lxml",
+        "任务失败或探测不可用"
+      ],
+      [
+        "隔离执行",
+        "Linux namespaces、Bubblewrap",
+        "拒绝转换；不降级到宿主直接跑"
+      ],
+      [
+        "持久化",
+        "本地磁盘、SQLite",
+        "受理 / 查询 / 产物访问可能失败"
+      ]
+    ],
+    "notes": "外部依赖应按阶段分析。GitHub 和各类软件源是在构建部署时使用，前面虚拟机拉取源码遇到连接重置，影响的是更新，不会自动让已部署的版本停止转换。DNS、TLS 和可选反向代理属于用户访问入口，如果它们故障，用户可能无法连接，但后端进程本身仍可能正常。Pandoc、python-docx 和 lxml 是本机运行依赖，不是外部 SaaS。Bubblewrap 则依赖 Linux 的内核与安全策略，如果不可用，服务应拒绝任务，不能为了看起来成功而关闭隔离。SQLite 和磁盘是单机故障点，容量不足和写入异常会影响受理或查询。还有一个有意的取舍：系统不会联网下载 Markdown 中的远程图片，这减少了网络不稳定与 SSRF 攻击面，但用户需要把本地图片随文档上传。依赖分析必须同时讲可用性和功能代价。\n\n【来源】代码基线 a558df7；资料查询日期 2026-11-06。\nserver/scripts/bootstrap.sh\nserver/scripts/install-node.sh\nserver/scripts/install-pandoc.sh\nserver/runner.py\nserver/validation.py\n【演讲提示】按页面图示顺序讲解，最后留约 10 秒解释一个具体例子或完成交接。",
+    "refs": [
+      "server/scripts/bootstrap.sh",
+      "server/scripts/install-node.sh",
+      "server/scripts/install-pandoc.sh",
+      "server/runner.py",
+      "server/validation.py"
+    ],
+    "seconds": 75
+  },
+  {
+    "number": 15,
+    "part": 3,
+    "title": "故障应落到明确的恢复路径",
+    "subtitle": "诊断归运维，错误契约归客户端",
+    "kind": "table",
+    "content": [
+      [
+        "故障",
+        "当前行为",
+        "需要补充"
+      ],
+      [
+        "沙箱 / 运行时失效",
+        "readyz 失败则拒绝任务",
+        "带限额的真实冒烟探测"
+      ],
+      [
+        "转换输出非 JSON",
+        "CONVERTER_FAILED",
+        "退出码、阶段、脱敏原因"
+      ],
+      [
+        "服务重启",
+        "运行中任务失败，排队任务可保留",
+        "排空发布和明确重试提示"
+      ],
+      [
+        "磁盘或清理异常",
+        "预算拒绝；部分清理忽略错误",
+        "字节监控和清理重试告警"
+      ],
+      [
+        "反向代理转发",
+        "proxy_headers=False",
+        "可信来源还原，防限流聚合"
+      ]
+    ],
+    "notes": "故障表不是为了列出尽可能多的错误码，而是把每类故障接到明确的恢复路径。探测不通过应该拒绝新任务，并提示维护者修复运行环境。转换进程无 JSON 应保留受控的退出码和阶段，客户端仍然只看到安全的简短说明。服务重启会中断运行中的任务，排队任务可能保留，但不能把它描述为转换自动续跑。磁盘与清理问题既要拒绝超预算请求，也要让维护者知道实际占用和清理滞后。反向代理还带来一个容易忽视的问题：当前 Uvicorn 不信任转发头，所有用户经过 Nginx 后可能显示为同一个回环地址，造成应用 IP 限流聚合。修复时必须只信任明确代理，不能直接接受客户端伪造的 X-Forwarded-For。这些约束决定了后面推荐方案的上线门槛。接下来第四部分比较可选部署平台。\n\n【来源】代码基线 a558df7；资料查询日期 2026-11-06。\nserver/__main__.py\nserver/jobs.py:Jobs.start\nserver/jobs.py:Jobs.finish\nserver/runner.py:Sandbox._execute\n【演讲提示】按页面图示顺序讲解，最后留约 10 秒解释一个具体例子或完成交接。",
+    "refs": [
+      "server/__main__.py",
+      "server/jobs.py:Jobs.start",
+      "server/jobs.py:Jobs.finish",
+      "server/runner.py:Sandbox._execute"
+    ],
+    "seconds": 80
+  },
+  {
+    "number": 16,
+    "part": 4,
+    "title": "三类部署方案的适配程度",
+    "subtitle": "先比较能力匹配，再比较单价",
+    "kind": "table",
+    "content": [
+      [
+        "方案",
+        "现有链路适配",
+        "状态与主要代价"
+      ],
+      [
+        "A 自有 Linux 2 核 2G",
+        "CLI / Pandoc 可直接保留",
+        "当前推荐；自管入口与运维"
+      ],
+      [
+        "B Python Workers",
+        "Pyodide / WASM，需重构执行链",
+        "不能原样运行当前方案"
+      ],
+      [
+        "C Cloudflare Containers",
+        "可封装本机运行时",
+        "需迁移状态、入口与隔离策略"
+      ],
+      [
+        "A+ 可选 Cloudflare 入口",
+        "计算留服务器，入口另加保护",
+        "仍需可信代理、防绕过验证"
+      ]
+    ],
+    "notes": "第四部分先比较能力。方案 A 是已有空闲 Linux 服务器，现有 CLI 和 Pandoc 可以继续使用，但系统运维和入口安全需要我们负责。方案 B 是 Python Workers，它不是完整 Linux 机器，不能因为支持 Python 就把带子进程的项目直接复制过去。方案 C 是 Cloudflare Containers，可以封装原生运行环境，但现有 SQLite、本地结果和 Bubblewrap 策略不能假定无需改变，必须验证容器权限和持久化。还有一种组合方案，计算仍留在自有服务器，Cloudflare 只负责可选入口保护。它能保留现有引擎，但不能自动解决可信代理和绕过入口问题。我们的比较顺序是先看功能与状态语义能否保持，再看单位资源价格。否则一个运行不了当前转换链的免费方案，并不能与能够完成转换的服务器直接做价格排名。\n\n【来源】代码基线 a558df7；资料查询日期 2026-11-06。\nhttps://developers.cloudflare.com/workers/languages/python/how-python-workers-work/\nhttps://developers.cloudflare.com/containers/platform-details/limits/\nserver/runner.py\nserver/store.py\n【演讲提示】按页面图示顺序讲解，最后留约 10 秒解释一个具体例子或完成交接。",
+    "refs": [
+      "https://developers.cloudflare.com/workers/languages/python/how-python-workers-work/",
+      "https://developers.cloudflare.com/containers/platform-details/limits/",
+      "server/runner.py",
+      "server/store.py"
+    ],
+    "seconds": 75
+  },
+  {
+    "number": 17,
+    "part": 4,
+    "title": "Workers 的边界是运行模型",
+    "subtitle": "Python 支持不等于可运行任意 Linux 二进制",
+    "kind": "points",
+    "content": [
+      [
+        "运行机制",
+        "CPython 经 Pyodide 编译为 WebAssembly，在 V8 isolate 中运行"
+      ],
+      [
+        "免费计划",
+        "100,000 次请求 / 日，单次 CPU 10 ms"
+      ],
+      [
+        "内存上限",
+        "128 MB / isolate，付费也不等于独占 128 MB / 请求"
+      ],
+      [
+        "适用位置",
+        "静态网页、轻量入口；原生转换放服务器或容器"
+      ]
+    ],
+    "notes": "官方文档说明，Python Workers 使用 Pyodide，也就是把 CPython 编译为 WebAssembly，再在 V8 isolate 内执行。这与我们当前依赖 Linux namespace、文件系统和 Pandoc 子进程的执行模型不同。免费 Workers 每天十万次请求，单次 CPU 时间十毫秒，内存是一百二十八 MB 每个 isolate，不是每个请求独享的预算。付费可以提高 CPU 时间上限，但仍然不会因此变成原来的 Linux 子进程环境。Pages Functions 也采用 Workers 的计费与运行约束，并不是另一种可以绕过问题的免费主机。对本项目而言，Workers 很适合返回静态网页或处理轻量入口，但若要完成原生转换，就需要把工作交给服务器或 Containers。理论上重新实现成纯 WASM 转换链是一条研究路线，但它需要重新验证依赖、排版一致性和性能，不能叫作本次小迁移。\n\n【来源】代码基线 a558df7；资料查询日期 2026-11-06。\nhttps://developers.cloudflare.com/workers/platform/pricing/\nhttps://developers.cloudflare.com/workers/platform/limits/\nhttps://developers.cloudflare.com/workers/languages/python/how-python-workers-work/\n【演讲提示】按页面图示顺序讲解，最后留约 10 秒解释一个具体例子或完成交接。",
+    "refs": [
+      "https://developers.cloudflare.com/workers/platform/pricing/",
+      "https://developers.cloudflare.com/workers/platform/limits/",
+      "https://developers.cloudflare.com/workers/languages/python/how-python-workers-work/"
+    ],
+    "seconds": 80
+  },
+  {
+    "number": 18,
+    "part": 4,
+    "title": "Containers 的资源费用演算",
+    "subtitle": "美元 / 月；官方单价，运行时长为假设，不是整账单",
+    "kind": "table",
+    "content": [
+      [
+        "假设运行时长",
+        "内存费用",
+        "CPU 费用",
+        "磁盘费用",
+        "含 $5 基费的小计"
+      ],
+      [
+        "10 小时 / 月",
+        "$0.315",
+        "$0",
+        "$0",
+        "$5.32"
+      ],
+      [
+        "100 小时 / 月",
+        "$5.175",
+        "$3.150",
+        "$0.252",
+        "$13.58"
+      ],
+      [
+        "730 小时 / 月",
+        "$39.195",
+        "$25.830",
+        "$2.157",
+        "$72.18"
+      ]
+    ],
+    "notes": "Containers 没有免费计划中的资源额度，需要至少每月五美元的 Workers Paid。这里用 standard-2 演算，它提供一 vCPU、六 GiB 内存和十二 GB 磁盘，不等同于用户的二核二 G 服务器。我们假设容器运行期间平均使用零点五 vCPU，内存和磁盘按配置容量计费，并独占当月包含额度。官方包含二十五 GiB 小时内存、三百七十五 vCPU 分钟和二百 GB 小时磁盘，超额按对应秒单价计算。十小时、百小时和七百三十小时运行的小计分别约五点三二、十三点五八和七十二点一八美元。注意计费时长包括容器保持活跃的时间，不只是忙于转换的 CPU 时间。表中没有加入 Durable Objects、Worker 超额、持久存储、日志和超额出口，所以只能叫资源小计，不能当作最终报价，更不能据此比较同等吞吐。\n\n【来源】代码基线 a558df7；资料查询日期 2026-11-06。\nhttps://developers.cloudflare.com/containers/pricing/\nhttps://developers.cloudflare.com/containers/platform-details/limits/\nhttps://developers.cloudflare.com/workers/platform/pricing/\n【演讲提示】按页面图示顺序讲解，最后留约 10 秒解释一个具体例子或完成交接。",
+    "refs": [
+      "https://developers.cloudflare.com/containers/pricing/",
+      "https://developers.cloudflare.com/containers/platform-details/limits/",
+      "https://developers.cloudflare.com/workers/platform/pricing/"
+    ],
+    "seconds": 85,
+    "footnote": "演算配置：standard-2，1 vCPU / 6 GiB / 12 GB，平均使用 0.5 vCPU。\n独占包含额度；未计 DO、Worker 超额、持久化、日志及超额出口。"
+  },
+  {
+    "number": 19,
+    "part": 4,
+    "title": "本机样本性能与费用边界",
+    "subtitle": "WSL 28 逻辑 CPU；每类 5 次，无并发，无网络上传",
+    "kind": "table",
+    "content": [
+      [
+        "合成输入",
+        "输入大小",
+        "中位耗时",
+        "最大耗时"
+      ],
+      [
+        "简短中文 Markdown",
+        "48 B",
+        "0.194 s",
+        "0.371 s"
+      ],
+      [
+        "表格与公式",
+        "80 B",
+        "0.186 s",
+        "0.208 s"
+      ],
+      [
+        "200 段章节长文",
+        "17,013 B",
+        "0.549 s",
+        "0.814 s"
+      ]
+    ],
+    "notes": "这页给出我们能负责的实测数字。测试在 WSL Ubuntu 上进行，主机可见二十八个逻辑 CPU，每类合成文档跑五次，实际经过 Bubblewrap、资源限制和 CLI，记录从启动执行到生成文件的墙钟时间。短文中位数约零点一九四秒，表格公式约零点一八六秒，十七 KB 的两百段章节约零点五四九秒。表格公式略快于短文，样本数很少，差异不能解释成稳定规律。这些数字没有包含网页上传、排队和下载，也没有代表真实复杂图片负载，更不能换算成目标二核二 G 的 SLA。成本方面，空闲服务器已经付过租金，新增计算租金可能是零，但总成本仍包括原租金、域名、备份和维护工时。我们没有用户账单，也没有云容器对照实测，因此不会给出虚假的价格性能比。\n\n【来源】代码基线 a558df7；资料查询日期 2026-11-06。\nserver/docs/presentation/sources/benchmark.py\nserver/docs/presentation/sources/benchmark-results.json\nserver/runner.py\n【演讲提示】按页面图示顺序讲解，最后留约 10 秒解释一个具体例子或完成交接。",
+    "refs": [
+      "server/docs/presentation/sources/benchmark.py",
+      "server/docs/presentation/sources/benchmark-results.json",
+      "server/runner.py"
+    ],
+    "seconds": 80,
+    "footnote": "自有服务器：新增计算租金可能为 0。\n完整月成本 = 既有租金 S + 域名 / 备份等费用 + 运维工时。"
+  },
+  {
+    "number": 20,
+    "part": 4,
+    "title": "容量预算要同时看队列、内存和轮询",
+    "subtitle": "以下为模型演算，目标机吞吐与 P95 仍待实测",
+    "kind": "table",
+    "content": [
+      [
+        "维度",
+        "假设或现有默认值",
+        "可得到的结论"
+      ],
+      [
+        "串行服务率",
+        "假设每份平均 5 s",
+        "理论 720 份 / h；70% 占用约 504"
+      ],
+      [
+        "任务执行",
+        "单文件 60 s，单任务 180 s",
+        "截止时间，不是平均耗时"
+      ],
+      [
+        "活跃任务",
+        "全局上限 8，每会话 2",
+        "包含 running / cancelling"
+      ],
+      [
+        "客户端轮询",
+        "1.6 s 间隔，读限流 180 / min",
+        "5 个活跃页约 188 次 / min"
+      ],
+      [
+        "服务内存",
+        "rlimit 虚拟空间 1 GiB，模板 MemoryMax 768M",
+        "口径不同，必须测整组 RSS / OOM"
+      ]
+    ],
+    "notes": "为了量化后续容量，我们给出模型而不是承诺。假设目标机器平均每份文档五秒，串行理论上每小时七百二十份，按七成占用规划约五百零四份，但真实值取决于文件类型和长尾。默认八个是全局活跃任务上限，统计包含运行和取消中的任务，并不是八个空闲排队槽。客户端正常轮询间隔一点六秒，五个活跃页面就接近每分钟一百八十八次读取。如果反向代理让这些请求都落进同一个 IP 桶，就可能超过每分钟一百八十次默认读限流，这也是上线前必须验证的量化问题。内存方面，一 GiB 的 rlimit 限制虚拟地址空间，systemd 的七百六十八 M 限制整组实际内存，二者不相等。我们需要在目标机测服务加图片子进程和转换子进程的总峰值，再决定并发与预算。\n\n【来源】代码基线 a558df7；资料查询日期 2026-11-06。\nserver/settings.py\nserver/store.py:Store.insert\nserver/api/app.py:Guard\nserver/web/src/App.jsx\nserver/deploy/md2docx.service.in\n【演讲提示】按页面图示顺序讲解，最后留约 10 秒解释一个具体例子或完成交接。",
+    "refs": [
+      "server/settings.py",
+      "server/store.py:Store.insert",
+      "server/api/app.py:Guard",
+      "server/web/src/App.jsx",
+      "server/deploy/md2docx.service.in"
+    ],
+    "seconds": 85
+  },
+  {
+    "number": 21,
+    "part": 5,
+    "title": "ADR 决策关系",
+    "subtitle": "已采用的选择与待验收的部署决策分开标注",
+    "kind": "diagram",
+    "content": {
+      "nodes": [
+        {
+          "id": "goal",
+          "text": "目标：免费远程转换\n网页与 Agent 共用 API",
+          "x": 465,
+          "y": 185,
+          "w": 350,
+          "h": 85,
+          "role": "primary"
+        },
+        {
+          "id": "core",
+          "text": "ADR-001\n复用 CLI / core",
+          "x": 70,
+          "y": 335,
+          "w": 290,
+          "h": 95,
+          "role": "normal"
+        },
+        {
+          "id": "web",
+          "text": "ADR-002 / 006\n独立网页、同源访问",
+          "x": 490,
+          "y": 335,
+          "w": 300,
+          "h": 95,
+          "role": "normal"
+        },
+        {
+          "id": "session",
+          "text": "ADR-003\n自动匿名会话",
+          "x": 910,
+          "y": 335,
+          "w": 290,
+          "h": 95,
+          "role": "normal"
+        },
+        {
+          "id": "isolate",
+          "text": "ADR-004 / 005\n沙箱、串行、SQLite",
+          "x": 70,
+          "y": 525,
+          "w": 290,
+          "h": 95,
+          "role": "normal"
+        },
+        {
+          "id": "prod",
+          "text": "ADR-007 / 008\nTLS、systemd 待验收",
+          "x": 490,
+          "y": 525,
+          "w": 300,
+          "h": 95,
+          "role": "future"
+        },
+        {
+          "id": "future",
+          "text": "ADR-009 / 010\n诊断、按指标拆分",
+          "x": 910,
+          "y": 525,
+          "w": 290,
+          "h": 95,
+          "role": "future"
+        }
+      ],
+      "edges": [
+        [
+          "goal",
+          "core"
+        ],
+        [
+          "goal",
+          "web"
+        ],
+        [
+          "goal",
+          "session"
+        ],
+        [
+          "core",
+          "isolate"
+        ],
+        [
+          "web",
+          "prod"
+        ],
+        [
+          "session",
+          "future"
+        ]
+      ],
+      "caption": "ADR 记录背景、方案、代价与复议条件；图只展示依赖关系"
+    },
+    "notes": "第五部分用 ADR 说明这些结构为什么存在。ADR 是架构决策记录，不是把技术名词放进方框。它至少应该包含问题背景、选项、选择、代价和何时重新讨论。当前已采用的决策包括复用 CLI 和 core、把网页副本独立放进 server、使用自动匿名会话、同源访问，以及单执行循环配 SQLite。TLS 入口、可信代理与 systemd 仍属于待验收部署设计，不能把状态统一写成已上线。图把目标和决策之间的关联表示出来，但每个节点的详细解释仍保存在 ADR 文档。比如免费免登录会带来任务隐私问题，所以需要临时会话；小服务器资源有限，才优先控制执行并发和常驻组件。这样记录之后，未来换平台或加登录功能时，就能知道哪些是技术约束，哪些是当时用户明确选择的产品边界。\n\n【来源】代码基线 a558df7；资料查询日期 2026-11-06。\nserver/docs/ADR决策记录.md\n【演讲提示】按页面图示顺序讲解，最后留约 10 秒解释一个具体例子或完成交接。",
+    "refs": [
+      "server/docs/ADR决策记录.md"
+    ],
+    "seconds": 75
+  },
+  {
+    "number": 22,
+    "part": 5,
+    "title": "已采用决策的收益与代价",
+    "subtitle": "维护成本包含未来同步和故障定位工作",
+    "kind": "table",
+    "content": [
+      [
+        "决策",
+        "收益",
+        "代价与复议条件"
+      ],
+      [
+        "复用 CLI / core",
+        "结果一致，迁移范围小",
+        "继承编号问题；协议升级时复议"
+      ],
+      [
+        "网页独立副本",
+        "桌面不受本次改造牵连",
+        "编辑器与 defaults 人工同步"
+      ],
+      [
+        "匿名临时会话",
+        "无注册门槛，任务不公开",
+        "Cookie 丢失无法跨设备恢复"
+      ],
+      [
+        "SQLite + 单执行循环",
+        "组件少，资源预算容易控制",
+        "单故障域；容量触发后拆分"
+      ],
+      [
+        "Bubblewrap 隔离",
+        "限制网络和可见文件",
+        "依赖目标内核与安全策略"
+      ]
+    ],
+    "notes": "决策需要同时讲收益和代价。复用已有引擎减少了重写风险，也意味着继承编号清理等历史问题。独立网页副本让桌面用户的运行流程保持稳定，但将来同一个编辑器修复可能要同步两处。临时会话降低使用门槛并保护任务，但它不能实现账户式的跨设备恢复，也无法独自承担反滥用。SQLite 与单执行循环适合小规模服务，组件少、排查简单，可是接口和调度仍共进程，无法直接多实例扩容。Bubblewrap 让不可信文稿的执行受到网络和文件系统约束，但共享宿主内核，需要在目标系统验收。对这些选择的评价不是永远正确或错误，而是看它是否适合目前的用户、资源和交付目标。ADR 中的复议条件可以避免团队为了新技术而重构，也避免在旧方案已经不合适时仍然固守。\n\n【来源】代码基线 a558df7；资料查询日期 2026-11-06。\nserver/docs/ADR决策记录.md\nserver/docs/网页版迁移与验收.md\n【演讲提示】按页面图示顺序讲解，最后留约 10 秒解释一个具体例子或完成交接。",
+    "refs": [
+      "server/docs/ADR决策记录.md",
+      "server/docs/网页版迁移与验收.md"
+    ],
+    "seconds": 75
+  },
+  {
+    "number": 23,
+    "part": 5,
+    "title": "推荐目标：先完成单机受控部署",
+    "subtitle": "自有服务器执行转换，可选 Cloudflare 仅作入口",
+    "kind": "diagram",
+    "content": {
+      "nodes": [
+        {
+          "id": "client",
+          "text": "网页 / Agent",
+          "x": 70,
+          "y": 220,
+          "w": 240,
+          "h": 95,
+          "role": "normal"
+        },
+        {
+          "id": "edge",
+          "text": "可选 Cloudflare\nDNS / 入口保护",
+          "x": 465,
+          "y": 220,
+          "w": 300,
+          "h": 95,
+          "role": "future"
+        },
+        {
+          "id": "tls",
+          "text": "HTTPS 反向代理\n可信来源与入口预算",
+          "x": 900,
+          "y": 220,
+          "w": 300,
+          "h": 95,
+          "role": "future"
+        },
+        {
+          "id": "data",
+          "text": "SQLite + 私有文件\n备份与清理策略",
+          "x": 70,
+          "y": 455,
+          "w": 290,
+          "h": 105,
+          "role": "normal"
+        },
+        {
+          "id": "api",
+          "text": "单机 API / Jobs\n回环端口 + systemd",
+          "x": 465,
+          "y": 455,
+          "w": 300,
+          "h": 105,
+          "role": "primary"
+        },
+        {
+          "id": "sand",
+          "text": "Bubblewrap\n既有转换链",
+          "x": 900,
+          "y": 455,
+          "w": 300,
+          "h": 105,
+          "role": "normal"
+        }
+      ],
+      "edges": [
+        [
+          "client",
+          "edge"
+        ],
+        [
+          "edge",
+          "tls"
+        ],
+        [
+          "tls",
+          "api"
+        ],
+        [
+          "api",
+          "data"
+        ],
+        [
+          "api",
+          "sand"
+        ]
+      ],
+      "caption": "未启用 Cloudflare 时客户端直连 HTTPS 入口；虚线节点为部署目标"
+    },
+    "notes": "当前推荐先完成单机受控部署。自有服务器保留原生转换链，HTTPS 反向代理作为唯一业务入口，应用绑定回环端口，再通过专用用户和 systemd 管理资源与重启。Cloudflare 可以后续按网络体验和防护需求接入入口，但不是上线的唯一前提，也不是把转换自动搬到边缘。推荐理由有三个实际依据：已有空闲服务器、现有引擎依赖原生子进程、当前瓶颈首先是正确性与诊断而不是已证明的算力不足。风险同样明确，服务器是单点，运维由团队承担，匿名免费服务需要入口预算和滥用防护。上线前必须解决虚拟机失败，并验证代理不能被绕过、客户端来源不能伪造、多用户限流不会聚合。我们推荐的是带验收条件的目标方案，不是已经完成的生产拓扑。\n\n【来源】代码基线 a558df7；资料查询日期 2026-11-06。\nserver/SECURITY.md\nserver/deploy/md2docx.service.in\nserver/__main__.py\nserver/docs/ADR决策记录.md\n【演讲提示】按页面图示顺序讲解，最后留约 10 秒解释一个具体例子或完成交接。",
+    "refs": [
+      "server/SECURITY.md",
+      "server/deploy/md2docx.service.in",
+      "server/__main__.py",
+      "server/docs/ADR决策记录.md"
+    ],
+    "seconds": 80
+  },
+  {
+    "number": 24,
+    "part": 5,
+    "title": "新增功能的维护路径",
+    "subtitle": "稳定契约，让客户端扩展与执行平台变化分离",
+    "kind": "table",
+    "content": [
+      [
+        "变化",
+        "主要修改位置",
+        "应保留的兼容性"
+      ],
+      [
+        "新增 Agent 平台",
+        "Skill / HTTP 与附件适配",
+        "任务所有权、状态、下载契约"
+      ],
+      [
+        "新增样式字段",
+        "core 配置、服务校验、网页快照",
+        "schema 版本与旧配置"
+      ],
+      [
+        "更换服务器 / 容器",
+        "Runner 与部署适配",
+        "CLI 结果和 API 语义"
+      ],
+      [
+        "独立 Worker",
+        "Jobs 领取、租约、取消、恢复",
+        "幂等与清理一致性"
+      ],
+      [
+        "减少前端副本漂移",
+        "同步清单与契约回归",
+        "不在本阶段强改桌面结构"
+      ]
+    ],
+    "notes": "判断架构是否容易维护，可以看变化会传播到哪里。增加 Agent 平台首先属于 HTTP 和附件适配，不应为每个平台复制转换引擎。新增样式字段则必须从核心配置协议开始，服务严格校验和网页快照都要同步，不能只改界面。更换执行平台主要影响 Runner 和部署，但需要保持 CLI 结果及 API 的所有权、取消和错误语义。独立 Worker 的难点不在目录拆分，而在跨进程任务领取、租约、取消和清理。前端副本的长期成本可以先通过来源清单、版本标记和契约回归控制，等重复维护成为明确负担，再讨论共享 UI 包。这样做不是否定共享组件，而是尊重当前用户要求和改动范围。维护性应以变更传播和回归成本衡量，不能仅凭使用某个框架就说容易扩展。\n\n【来源】代码基线 a558df7；资料查询日期 2026-11-06。\nserver/web/src/config/defaults.json\nserver/models.py\nserver/validation.py\ncore/config_schema.py\nserver/docs/ADR决策记录.md\n【演讲提示】按页面图示顺序讲解，最后留约 10 秒解释一个具体例子或完成交接。",
+    "refs": [
+      "server/web/src/config/defaults.json",
+      "server/models.py",
+      "server/validation.py",
+      "core/config_schema.py",
+      "server/docs/ADR决策记录.md"
+    ],
+    "seconds": 75
+  },
+  {
+    "number": 25,
+    "part": 5,
+    "title": "推荐方案的主要风险",
+    "subtitle": "先消除发布阻塞，再扩大使用范围",
+    "kind": "table",
+    "content": [
+      [
+        "优先级",
+        "风险",
+        "处理与验收"
+      ],
+      [
+        "P0",
+        "VMware 转换失败未定位",
+        "最小文档与受限任务复现通过"
+      ],
+      [
+        "P0",
+        "原始退出信息缺失",
+        "管理员受控诊断，不公开正文"
+      ],
+      [
+        "P1",
+        "代理 IP 聚合 / 伪造",
+        "可信链、防绕过和多客户端测试"
+      ],
+      [
+        "P1",
+        "清理失败、磁盘耗尽",
+        "重试告警、备份期限、预算验证"
+      ],
+      [
+        "P1",
+        "2 核 2G 容量未知",
+        "RSS / P95 / 排队 / OOM 压测"
+      ],
+      [
+        "P2",
+        "网页组件快照漂移",
+        "同步记录和协议兼容回归"
+      ]
+    ],
+    "notes": "推荐方案不是风险清单越短越好，而是风险有优先顺序。现在最先处理的是目标虚拟机无法完成转换和诊断不足，这两个问题不解决，就不能通过上线验收。然后是入口来源、防绕过、清理和资源预算，它们会随着匿名免费用户增长迅速变得重要。网页副本漂移属于长期维护风险，可以通过同步记录和回归控制，优先级低于当前正确性。特别是清理，输入在终态执行删除不等于磁盘永远没有残留，需要观察失败与重试。资源预算也不能因为服务器空闲就不测，图片预处理和转换可能重叠，内存峰值比平均值重要。风险页的作用是把每个风险变成能检查的退出条件。下面第六位同学会说明这些事项如何分批交付，以及迁移时如何减少中断和保留回退能力。\n\n【来源】代码基线 a558df7；资料查询日期 2026-11-06。\nserver/SECURITY.md\nserver/jobs.py\nserver/runner.py\nserver/docs/分阶段升级路线.md\n【演讲提示】按页面图示顺序讲解，最后留约 10 秒解释一个具体例子或完成交接。",
+    "refs": [
+      "server/SECURITY.md",
+      "server/jobs.py",
+      "server/runner.py",
+      "server/docs/分阶段升级路线.md"
+    ],
+    "seconds": 80
+  },
+  {
+    "number": 26,
+    "part": 6,
+    "title": "分阶段升级路线",
+    "subtitle": "按验收门槛推进，不预先承诺未知工期",
+    "kind": "diagram",
+    "content": {
+      "nodes": [
+        {
+          "id": "s0",
+          "text": "0 正确性与诊断\n目标机真实转换通过",
+          "x": 70,
+          "y": 210,
+          "w": 310,
+          "h": 100,
+          "role": "primary"
+        },
+        {
+          "id": "s1",
+          "text": "1 网页完整验收\n配置、批量、恢复",
+          "x": 490,
+          "y": 210,
+          "w": 310,
+          "h": 100,
+          "role": "normal"
+        },
+        {
+          "id": "s2",
+          "text": "2 单机受控部署\nTLS、systemd、回退",
+          "x": 900,
+          "y": 210,
+          "w": 310,
+          "h": 100,
+          "role": "future"
+        },
+        {
+          "id": "s5",
+          "text": "5 多实例与存储分离\n按实际规模决策",
+          "x": 70,
+          "y": 455,
+          "w": 310,
+          "h": 110,
+          "role": "future"
+        },
+        {
+          "id": "s4",
+          "text": "4 拆独立 Worker\n租约、取消、恢复",
+          "x": 490,
+          "y": 455,
+          "w": 310,
+          "h": 110,
+          "role": "future"
+        },
+        {
+          "id": "s3",
+          "text": "3 小范围试运行\n容量、入口、Agent",
+          "x": 900,
+          "y": 455,
+          "w": 310,
+          "h": 110,
+          "role": "future"
+        }
+      ],
+      "edges": [
+        [
+          "s0",
+          "s1"
+        ],
+        [
+          "s1",
+          "s2"
+        ],
+        [
+          "s2",
+          "s3"
+        ],
+        [
+          "s3",
+          "s4"
+        ],
+        [
+          "s4",
+          "s5"
+        ]
+      ],
+      "caption": "阶段 4 / 5 仅在指标触发后实施；阶段 0 是当前发布阻塞"
+    },
+    "notes": "最后一部分把演进分成六个阶段。阶段零解决目标机正确性和诊断，阶段一完成网页功能验收，阶段二交付单机受控部署，阶段三进行小范围真实使用和容量观察。这四步是近期路线。阶段四才拆独立 Worker，阶段五才考虑多实例和外部存储，它们都需要指标触发，而不是默认下一周就必须完成。分阶段的好处是每一批都有可验证的交付，不把多个未知因素堆在一次大迁移里。当前应先处理受控诊断这个横向能力，因为它改动范围相对小，却能帮助定位所有执行环境问题。至于第一个真正要拆成独立进程的模块，应当是任务执行器，因为它承担高资源消耗和进程故障，接口又已经可以通过持久任务状态解耦。两者分别解决可诊断性和故障隔离，不应混成同一次重构。\n\n【来源】代码基线 a558df7；资料查询日期 2026-11-06。\nserver/docs/分阶段升级路线.md\nserver/jobs.py\nserver/runner.py\n【演讲提示】按页面图示顺序讲解，最后留约 10 秒解释一个具体例子或完成交接。",
+    "refs": [
+      "server/docs/分阶段升级路线.md",
+      "server/jobs.py",
+      "server/runner.py"
+    ],
+    "seconds": 80
+  },
+  {
+    "number": 27,
+    "part": 6,
+    "title": "每一批迁移交付什么",
+    "subtitle": "先交付受控能力，再考虑独立进程与多实例",
+    "kind": "table",
+    "content": [
+      [
+        "批次",
+        "具体交付",
+        "通过条件"
+      ],
+      [
+        "0 / 1",
+        "安全诊断、最小复现、网页回归",
+        "目标 VM 中文 / 图片 / 公式成功"
+      ],
+      [
+        "2",
+        "专用用户、TLS、systemd、版本目录",
+        "手动与 systemd 一致；回退演练"
+      ],
+      [
+        "3",
+        "指标、真实 IP、防护、首批 Agent 示例",
+        "容量目标、网络体验与预算通过"
+      ],
+      [
+        "4",
+        "API / Worker 分进程，领取租约与心跳",
+        "重启不重复执行，取消可达"
+      ],
+      [
+        "5",
+        "外部状态 / 队列 / 对象存储",
+        "归属、过期、删除、幂等不变"
+      ]
+    ],
+    "notes": "这一页把路线变成每批交付。前两批不是再加更多功能，而是把已有能力在目标虚拟机上证实，包括中文、图片和公式，再补齐安全诊断。部署批次要记录发布提交、配置和环境版本，验证手动启动与 systemd 启动的结果一致，并完成一次真实回退。试运行批次收集成功率、队列等待、耗时、总 RSS、磁盘、限流和取消耗时，同时给首批 Agent 提供可工作的附件示例。独立 Worker 批次必须增加原子领取、租约和心跳，验证崩溃时不会让两个进程同时执行同一任务。多实例批次再迁移状态和文件，不是把 SQLite 放到共享网络盘就算完成。每一批都保持现有 API 语义，这样客户端可以逐步适配，而不用在平台变更时全部重写。未达到通过条件时暂停推进，比按日期强行上线更可靠。\n\n【来源】代码基线 a558df7；资料查询日期 2026-11-06。\nserver/docs/分阶段升级路线.md\nserver/store.py\nserver/API.md\n【演讲提示】按页面图示顺序讲解，最后留约 10 秒解释一个具体例子或完成交接。",
+    "refs": [
+      "server/docs/分阶段升级路线.md",
+      "server/store.py",
+      "server/API.md"
+    ],
+    "seconds": 75
+  },
+  {
+    "number": 28,
+    "part": 6,
+    "title": "不停机迁移需要先补齐前提",
+    "subtitle": "当前采用排空重启；未来才具备双版本切换条件",
+    "kind": "diagram",
+    "content": {
+      "nodes": [
+        {
+          "id": "entry",
+          "text": "稳定 HTTPS 入口\n保持客户端地址",
+          "x": 70,
+          "y": 240,
+          "w": 290,
+          "h": 110,
+          "role": "future"
+        },
+        {
+          "id": "a",
+          "text": "旧版 API / Worker\n停止领取、完成在途",
+          "x": 480,
+          "y": 220,
+          "w": 310,
+          "h": 110,
+          "role": "future"
+        },
+        {
+          "id": "b",
+          "text": "新版 API / Worker\n预热、冒烟、少量流量",
+          "x": 480,
+          "y": 445,
+          "w": 310,
+          "h": 110,
+          "role": "future"
+        },
+        {
+          "id": "state",
+          "text": "共享持久状态与产物\n版本兼容 + 领取租约",
+          "x": 900,
+          "y": 325,
+          "w": 310,
+          "h": 120,
+          "role": "future"
+        }
+      ],
+      "edges": [
+        [
+          "entry",
+          "a"
+        ],
+        [
+          "entry",
+          "b"
+        ],
+        [
+          "a",
+          "state"
+        ],
+        [
+          "b",
+          "state"
+        ]
+      ],
+      "caption": "目标图：当前同数据目录 flock 会拒绝第二实例，不能直接照图部署"
+    },
+    "notes": "用户提出不停机迁移，这必须分当前做法与未来条件。当前 API、执行器和 SQLite 共进程，同一数据目录还有文件锁，两个版本不能直接并行启动。因此现阶段最诚实的做法是先停止新任务受理，等待正在运行的任务完成，再短暂重启，尽量保留下载与清晰提示，但这不是严格零停机。图展示的是未来目标：稳定入口分配旧版与新版流量，Worker 有领取租约，状态和产物支持兼容访问，旧版停止领取并排空，新版预热后逐步接流量。数据库先做可向后兼容的扩展，再切应用，最后才清理旧字段。即便采用蓝绿部署，也必须保留相同会话验证语义、任务归属和取消机制。缺少这些前提时，双版本可能造成重复转换或丢失访问权，所以不能把端口切换等同于无损迁移。\n\n【来源】代码基线 a558df7；资料查询日期 2026-11-06。\nserver/api/app.py:lifespan\nserver/store.py:Store.next_job\nserver/jobs.py\nserver/docs/分阶段升级路线.md\n【演讲提示】按页面图示顺序讲解，最后留约 10 秒解释一个具体例子或完成交接。",
+    "refs": [
+      "server/api/app.py:lifespan",
+      "server/store.py:Store.next_job",
+      "server/jobs.py",
+      "server/docs/分阶段升级路线.md"
+    ],
+    "seconds": 85
+  },
+  {
+    "number": 29,
+    "part": 6,
+    "title": "发布与回退流程",
+    "subtitle": "代码、配置、依赖和数据兼容性共同决定能否回退",
+    "kind": "diagram",
+    "content": {
+      "nodes": [
+        {
+          "id": "prep",
+          "text": "准备版本目录\n锁依赖、备份与校验",
+          "x": 70,
+          "y": 210,
+          "w": 310,
+          "h": 100,
+          "role": "normal"
+        },
+        {
+          "id": "smoke",
+          "text": "隔离冒烟通过\n最小文档与沙箱验证",
+          "x": 490,
+          "y": 210,
+          "w": 310,
+          "h": 100,
+          "role": "normal"
+        },
+        {
+          "id": "drain",
+          "text": "暂停新提交并排空\n记录在途任务",
+          "x": 900,
+          "y": 210,
+          "w": 310,
+          "h": 100,
+          "role": "normal"
+        },
+        {
+          "id": "rollback",
+          "text": "失败：切回旧代码环境\n校验数据库兼容",
+          "x": 70,
+          "y": 450,
+          "w": 310,
+          "h": 110,
+          "role": "future"
+        },
+        {
+          "id": "check",
+          "text": "切换后验证\n接口、转换、下载",
+          "x": 490,
+          "y": 450,
+          "w": 310,
+          "h": 110,
+          "role": "primary"
+        },
+        {
+          "id": "switch",
+          "text": "切换代码与配置\n启动单实例服务",
+          "x": 900,
+          "y": 450,
+          "w": 310,
+          "h": 110,
+          "role": "normal"
+        }
+      ],
+      "edges": [
+        [
+          "prep",
+          "smoke"
+        ],
+        [
+          "smoke",
+          "drain"
+        ],
+        [
+          "drain",
+          "switch"
+        ],
+        [
+          "switch",
+          "check"
+        ],
+        [
+          "check",
+          "rollback"
+        ]
+      ],
+      "caption": "不要直接 git reset 覆盖现场；不能用旧数据库备份抹掉新任务"
+    },
+    "notes": "一个可回退的发布流程从准备开始。我们应该使用独立版本目录，记录 commit、配置和依赖，先在隔离的数据目录做冒烟。现阶段发布需要暂停新提交并排空任务，然后切换代码与配置，启动唯一实例，验证健康、真实转换和下载。如果验证失败，回到保留的旧代码和旧运行环境。这里最危险的误区，是把回退理解成随手 git reset 或恢复一个旧数据库备份。代码可能已经依赖新字段，旧备份还可能抹掉发布后用户刚提交的任务。所以数据库变更应遵循先扩展、保持兼容、再切换、最后收缩的顺序，有破坏性变更时应单独制定数据恢复方案。回退演练还要检查运行进程和产物，不能只看网页恢复。当前脚本主要负责安装、构建和启动，这张图是待实现和演练的发布流程，不宣称已经具有一键回退能力。\n\n【来源】代码基线 a558df7；资料查询日期 2026-11-06。\nserver/scripts/bootstrap.sh\nserver/scripts/run.sh\nserver/jobs.py:Jobs.close\nserver/deploy/md2docx.service.in\n【演讲提示】按页面图示顺序讲解，最后留约 10 秒解释一个具体例子或完成交接。",
+    "refs": [
+      "server/scripts/bootstrap.sh",
+      "server/scripts/run.sh",
+      "server/jobs.py:Jobs.close",
+      "server/deploy/md2docx.service.in"
+    ],
+    "seconds": 85
+  },
+  {
+    "number": 30,
+    "part": 6,
+    "title": "验收门槛与团队校核",
+    "subtitle": "六位讲者分别对本部分的证据与假设签核",
+    "kind": "table",
+    "content": [
+      [
+        "负责人",
+        "交付证据",
+        "阻止发布的条件"
+      ],
+      [
+        "1 / 2 现状与结构",
+        "代码节点、调用关系、文档差异",
+        "把规划画成现状或漏掉产品边界"
+      ],
+      [
+        "3 数据与故障",
+        "真实转换、归属、清理、诊断",
+        "VM 失败未定位或数据越权"
+      ],
+      [
+        "4 平台与成本",
+        "官方价格、计算假设、目标机压测",
+        "用样本或资源小计冒充承诺"
+      ],
+      [
+        "5 架构决策",
+        "ADR 状态、代价、复议条件",
+        "风险无责任人或无验收"
+      ],
+      [
+        "6 升级与回退",
+        "排空、版本记录、恢复演练",
+        "不能证明任务与数据可恢复"
+      ]
+    ],
+    "notes": "最后用验收门槛结束汇报。第一和第二位讲者核对产品边界、模块节点以及代码调用，确认图没有把未来目标画成现状。第三位负责真实转换、任务归属、清理与故障诊断，当前虚拟机错误仍是阻塞。第四位确认平台单价、演算假设和性能测试范围，避免把小样本或费用小计当成服务承诺。第五位维护 ADR，明确每个决定的状态、代价和重新讨论条件。第六位验证排空、版本记录与回退，不仅恢复网页，也要核对任务和数据。基于目前证据，我们建议先让自有服务器方案达到受控上线标准，再根据容量指标决定是否拆 Worker 或迁移 Containers。Cloudflare Workers 可以承担静态或入口角色，原生转换链不做无依据的直接搬迁。六个人完成事实校核后，再共同确认下一批的目标与责任人。\n\n【来源】代码基线 a558df7；资料查询日期 2026-11-06。\nserver/docs/ADR决策记录.md\nserver/docs/分阶段升级路线.md\nserver/docs/presentation/sources/benchmark-results.json\n【演讲提示】按页面图示顺序讲解，最后留约 10 秒解释一个具体例子或完成交接。",
+    "refs": [
+      "server/docs/ADR决策记录.md",
+      "server/docs/分阶段升级路线.md",
+      "server/docs/presentation/sources/benchmark-results.json"
+    ],
+    "seconds": 80
+  }
+]

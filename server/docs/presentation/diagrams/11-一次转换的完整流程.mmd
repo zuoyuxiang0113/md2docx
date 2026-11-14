@@ -1,0 +1,12 @@
+flowchart TB
+    input["选择文件 / 粘贴文本<br/>检查临时会话"]
+    check["POST /v1/jobs<br/>校验与图片隔离检查"]
+    save["私有工作区 + SQLite<br/>保存 queued，返回 202"]
+    result["查询状态 / 鉴权下载<br/>校验文件并保存"]
+    clean["验产物 / 终态入库<br/>清理输入与配置"]
+    exec["Jobs 领取任务<br/>沙箱 CLI 转换"]
+    input --> check
+    check --> save
+    save --> exec
+    exec --> clean
+    clean --> result

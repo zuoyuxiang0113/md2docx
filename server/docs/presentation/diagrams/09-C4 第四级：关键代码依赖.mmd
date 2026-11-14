@@ -1,0 +1,12 @@
+flowchart TB
+    ui["App.jsx<br/>界面与任务交互"]
+    http["api.js<br/>fetch / FormData"]
+    api["api/app.py<br/>create_job()"]
+    cli["cli/md2docx.py<br/>CLI 契约"]
+    runner["Jobs.execute()<br/>Sandbox.run()"]
+    core["core 转换函数<br/>Pandoc / OOXML"]
+    ui --> http
+    http --> api
+    api --> runner
+    runner --> cli
+    cli --> core

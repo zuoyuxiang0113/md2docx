@@ -1,0 +1,10 @@
+flowchart TB
+    user["普通用户<br/>浏览器"]
+    agent["Agent 平台<br/>HTTP 与附件能力"]
+    sys["在线转换系统<br/>网页 + API + 执行"]
+    admin["维护者<br/>WSL 开发与发布"]
+    git["GitHub<br/>源码与版本"]
+    user --> sys
+    agent --> sys
+    admin --> sys
+    git --> sys

@@ -1,0 +1,12 @@
+flowchart TB
+    mem["请求体进入内存<br/>Guard 有字节上限"]
+    stage["staging 临时目录<br/>写输入与 config"]
+    verify["隔离验证图片<br/>重新检查幂等"]
+    db["SQLite 事务提交<br/>jobs + session 续期"]
+    rename["rename 到 jobs/jobId<br/>同文件系统目录切换"]
+    ready["检查资源预算<br/>准备有效任务对象"]
+    mem --> stage
+    stage --> verify
+    verify --> ready
+    ready --> rename
+    rename --> db

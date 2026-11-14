@@ -46,3 +46,28 @@ Python core
 - 配置页内部分类为页面、正文、标题、表格、代码块、图片、公式、编号；转换使用固定样式对应关系。
 - 设置页提供常规、运行环境、日志与诊断、关于几个入口；转换相关选项收敛在常规页中，应用使用唯一的紧凑窗口布局。
 - 运行环境页检查 Python、Pandoc、python-docx 和 lxml，并显示版本与路径。
+
+
+## Online service (a558df7, 2026-11-06)
+
+The desktop flow above remains local. The new web application is an independent snapshot under `server/web/`; FastAPI serves its build and the HTTP API.
+
+```text
+Browser / Agent
+    -> server/api/app.py (Guard, session, manifest/config validation)
+    -> private staging files -> jobs workspace rename -> SQLite transaction
+    -> Jobs loop in the SAME API process
+    -> Bubblewrap + limit_exec -> existing CLI -> core -> Pandoc / OOXML
+    -> private DOCX + SHA-256 -> owner-checked download
+```
+
+- `server/app.py` preserves the import entry point. `server/api/app.py` owns HTTP routes. `server/jobs.py`, `store.py` and `runner.py` retain their existing paths.
+- SQLite WAL stores session hashes, job metadata, idempotency and rate counters. Markdown/image bytes and DOCX files reside in the private data directory, not the database. Filename metadata remains in job payloads.
+- File rename and SQLite commit are separate operations, not a distributed transaction. Startup scans staging and orphan workspaces, and marks interrupted running tasks failed.
+- One API worker and an embedded sequential executor share a process. The per-data-directory `flock` prevents a second instance; rolling deployment and distributed workers are future work.
+- `readyz` probes runtime availability, not the entire resource-limited conversion chain. WSL samples succeeded, but VMware `prompt.md` returned `CONVERTER_FAILED`; its root cause is unresolved.
+- Terminal jobs attempt input/config cleanup. Results default to 24-hour retention, session validity to 48 hours. Cleanup failure handling and backup deletion policy need further validation.
+- `worker.js`, `wrangler.toml` and the website deployment workflow serve only `website/` static assets. They do not deploy `server/web` or run conversions.
+- Production TLS, trusted proxy/client IP handling, systemd compatibility and capacity on the 2-core/2GB target remain acceptance gates. The current service has not demonstrated zero-downtime upgrades.
+
+Detailed code-derived views: [C4](../server/docs/架构梳理-C4.md), [ADR](../server/docs/ADR决策记录.md), [phased upgrade](../server/docs/分阶段升级路线.md), [six-speaker presentation](../server/docs/presentation/README.md).

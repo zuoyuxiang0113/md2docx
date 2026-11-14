@@ -13,7 +13,7 @@
 %APPDATA%\md2docx\logs\jobs\<jobId>.jsonl
 ```
 
-CLI 默认使用同一位置，也可以通过 `MD2DOCX_LOG_DIR` 指定目录。普通应用日志和一次转换任务的 JSONL 日志使用相同字段：`timestamp`、`level`、`component`、`event`、`jobId`、`file`、`stage`、`code`、`message`。
+CLI 可通过 `MD2DOCX_LOG_DIR` 指定日志目录；未指定时，有 `APPDATA` 环境变量就使用上述位置，没有则回退到 `~/.config/md2docx/logs`。这是当前实现的目录选择规则，不应只按操作系统名称推断。普通应用日志和一次转换任务的 JSONL 日志使用相同字段：`timestamp`、`level`、`component`、`event`、`jobId`、`file`、`stage`、`code`、`message`。
 
 未打包的 Electron 开发端默认写入 `%APPDATA%\md2docx\logs-dev`，它调用的 CLI 使用同一目录。正式应用使用 `logs`；显式设置 `MD2DOCX_LOG_DIR` 时优先使用该目录。独立 CLI 默认仍写入 `logs`。升级后首次启动会把旧版 `%APPDATA%\md2docx-desktop-demo` 中的设置、配置、工作副本与日志迁移到新目录并移除旧目录。
 

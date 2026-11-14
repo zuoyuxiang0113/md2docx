@@ -1,0 +1,12 @@
+flowchart TB
+    prep["准备版本目录<br/>锁依赖、备份与校验"]
+    smoke["隔离冒烟通过<br/>最小文档与沙箱验证"]
+    drain["暂停新提交并排空<br/>记录在途任务"]
+    rollback["失败：切回旧代码环境<br/>校验数据库兼容"]
+    check["切换后验证<br/>接口、转换、下载"]
+    switch["切换代码与配置<br/>启动单实例服务"]
+    prep --> smoke
+    smoke --> drain
+    drain --> switch
+    switch --> check
+    check --> rollback

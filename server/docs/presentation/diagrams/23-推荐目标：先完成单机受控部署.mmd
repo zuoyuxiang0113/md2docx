@@ -1,0 +1,12 @@
+flowchart TB
+    client["网页 / Agent"]
+    edge["可选 Cloudflare<br/>DNS / 入口保护"]
+    tls["HTTPS 反向代理<br/>可信来源与入口预算"]
+    data["SQLite + 私有文件<br/>备份与清理策略"]
+    api["单机 API / Jobs<br/>回环端口 + systemd"]
+    sand["Bubblewrap<br/>既有转换链"]
+    client --> edge
+    edge --> tls
+    tls --> api
+    api --> data
+    api --> sand

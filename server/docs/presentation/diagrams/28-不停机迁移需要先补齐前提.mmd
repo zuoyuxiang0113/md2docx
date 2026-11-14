@@ -1,0 +1,9 @@
+flowchart TB
+    entry["稳定 HTTPS 入口<br/>保持客户端地址"]
+    a["旧版 API / Worker<br/>停止领取、完成在途"]
+    b["新版 API / Worker<br/>预热、冒烟、少量流量"]
+    state["共享持久状态与产物<br/>版本兼容 + 领取租约"]
+    entry --> a
+    entry --> b
+    a --> state
+    b --> state

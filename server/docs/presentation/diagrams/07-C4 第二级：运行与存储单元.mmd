@@ -1,0 +1,13 @@
+flowchart TB
+    client["浏览器 / Agent"]
+    api["Uvicorn / FastAPI<br/>单 Python 进程"]
+    queue["Jobs 异步循环<br/>同进程、串行执行"]
+    db["SQLite WAL<br/>任务 / 会话 / 幂等"]
+    fs["私有工作区<br/>输入 / 配置 / DOCX"]
+    sandbox["Bubblewrap 子进程<br/>CLI 与 Pandoc"]
+    client --> api
+    api --> db
+    api --> fs
+    api --> queue
+    queue --> sandbox
+    sandbox --> fs

@@ -1,0 +1,131 @@
+{
+  "scope": "WSL Ubuntu-26.04, local synthetic sandbox CLI samples; not VMware, not 2-core/2GB capacity",
+  "logical_cpus": 28,
+  "samples": [
+    {
+      "case": "small",
+      "wall_s": 0.3708,
+      "child_highwater_kib": 24304,
+      "input_bytes": 48,
+      "output_bytes": 10763
+    },
+    {
+      "case": "small",
+      "wall_s": 0.2115,
+      "child_highwater_kib": 24268,
+      "input_bytes": 48,
+      "output_bytes": 10763
+    },
+    {
+      "case": "small",
+      "wall_s": 0.1925,
+      "child_highwater_kib": 24296,
+      "input_bytes": 48,
+      "output_bytes": 10763
+    },
+    {
+      "case": "small",
+      "wall_s": 0.1943,
+      "child_highwater_kib": 24340,
+      "input_bytes": 48,
+      "output_bytes": 10763
+    },
+    {
+      "case": "small",
+      "wall_s": 0.1837,
+      "child_highwater_kib": 24300,
+      "input_bytes": 48,
+      "output_bytes": 10763
+    },
+    {
+      "case": "table_math",
+      "wall_s": 0.2078,
+      "child_highwater_kib": 24396,
+      "input_bytes": 80,
+      "output_bytes": 11087
+    },
+    {
+      "case": "table_math",
+      "wall_s": 0.1853,
+      "child_highwater_kib": 24460,
+      "input_bytes": 80,
+      "output_bytes": 11088
+    },
+    {
+      "case": "table_math",
+      "wall_s": 0.1933,
+      "child_highwater_kib": 24224,
+      "input_bytes": 80,
+      "output_bytes": 11088
+    },
+    {
+      "case": "table_math",
+      "wall_s": 0.1863,
+      "child_highwater_kib": 24452,
+      "input_bytes": 80,
+      "output_bytes": 11088
+    },
+    {
+      "case": "table_math",
+      "wall_s": 0.1827,
+      "child_highwater_kib": 24272,
+      "input_bytes": 80,
+      "output_bytes": 11088
+    },
+    {
+      "case": "long",
+      "wall_s": 0.8143,
+      "child_highwater_kib": 24392,
+      "input_bytes": 17013,
+      "output_bytes": 18846
+    },
+    {
+      "case": "long",
+      "wall_s": 0.5311,
+      "child_highwater_kib": 24264,
+      "input_bytes": 17013,
+      "output_bytes": 18845
+    },
+    {
+      "case": "long",
+      "wall_s": 0.5258,
+      "child_highwater_kib": 24352,
+      "input_bytes": 17013,
+      "output_bytes": 18845
+    },
+    {
+      "case": "long",
+      "wall_s": 0.5491,
+      "child_highwater_kib": 24300,
+      "input_bytes": 17013,
+      "output_bytes": 18846
+    },
+    {
+      "case": "long",
+      "wall_s": 0.5501,
+      "child_highwater_kib": 24168,
+      "input_bytes": 17013,
+      "output_bytes": 18846
+    }
+  ],
+  "summary": {
+    "small": {
+      "n": 5,
+      "median_s": 0.1943,
+      "max_s": 0.3708,
+      "max_child_highwater_mib": 23.8
+    },
+    "table_math": {
+      "n": 5,
+      "median_s": 0.1863,
+      "max_s": 0.2078,
+      "max_child_highwater_mib": 23.9
+    },
+    "long": {
+      "n": 5,
+      "median_s": 0.5491,
+      "max_s": 0.8143,
+      "max_child_highwater_mib": 23.8
+    }
+  }
+}

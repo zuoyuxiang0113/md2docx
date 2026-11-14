@@ -1,0 +1,13 @@
+flowchart TB
+    guard["Guard / CORS<br/>字节、来源、限流"]
+    route["API Routes<br/>会话 / 任务 / 下载"]
+    valid["Models / Validation<br/>清单、配置、图片"]
+    store["Store<br/>SQLite 与归属校验"]
+    jobs["Jobs<br/>状态、取消、清理"]
+    run["Sandbox / limit_exec<br/>执行与资源限制"]
+    guard --> route
+    route --> valid
+    route --> store
+    route --> jobs
+    jobs --> store
+    jobs --> run
