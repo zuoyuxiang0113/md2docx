@@ -257,6 +257,45 @@ def test_subprocess_limits_and_cancellation(tmp_path, mode, expected):
     asyncio.run(check())
 
 
+def test_diagnostic_distinguishes_failure_causes(tmp_path):
+    """ADR-009：同一公开错误码必须能区分进程启动、输出格式与资源触发。"""
+    project = tmp_path / "fake-project"
+    (project / "cli").mkdir(parents=True)
+    (project / "core").mkdir()
+    workspace = tmp_path / "work"
+    (workspace / "inputs").mkdir(parents=True)
+    (workspace / "outputs").mkdir()
+    (workspace / "config.json").write_text("{}")
+    # 非 JSON 的 stdout：历史 CONVERTER_FAILED 的判定点。
+    (project / "cli/md2docx.py").write_text("import sys; sys.stdout.write('not json at all'); sys.stderr.write('boom: /home/secret/x.md'); sys.exit(3)")
+    s = settings(tmp_path, project=project, diagnostic_stderr=True)
+
+    async def check():
+        with pytest.raises(RunFailure) as failure:
+            await Sandbox(s).run(workspace, "dummy.md", "out.docx", {"missingImages": "warning"}, "test-job", asyncio.Event(), lambda stage: None, 5)
+        diagnostic = failure.value.diagnostic
+        assert failure.value.code == "CONVERTER_FAILED"
+        assert diagnostic["reason"] == "stdout-not-json"
+        assert diagnostic["exitCode"] == 3
+        assert diagnostic["signal"] is None
+        # stderr 开启后仍须脱敏，不得带出主机路径。
+        assert "/home/secret" not in (diagnostic["detail"] or "")
+        assert "boom" in (diagnostic["detail"] or "")
+    asyncio.run(check())
+
+
+def test_diagnostic_records_rlimit_signal(tmp_path):
+    """ADR-009：被 rlimit 杀掉的进程要能看出是哪个信号，而不是笼统失败。"""
+    from server.runner import _signal_name
+    assert _signal_name(-9) == "SIGKILL"
+    assert _signal_name(-24) == "SIGXCPU"
+    assert _signal_name(0) is None
+    from server.errors import scrub
+    assert "/home/secret" not in scrub("error at /home/secret/dir/file.md")
+    assert "supersecret" not in scrub("token=supersecret")
+
+
+def test_stop_on_error_and_expiration(tmp_path):
 def test_stop_on_error_and_expiration(tmp_path):
     value = body()
     value["documents"] = [{"id":"bad","path":"bad.md","content":"![图](missing.png)"}, {"id":"later","path":"later.md","content":"# Later"}]
