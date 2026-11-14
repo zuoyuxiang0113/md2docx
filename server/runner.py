@@ -7,12 +7,26 @@ from pathlib import Path
 import shutil
 import signal
 import sys
-from .errors import ApiError
+from .errors import ApiError, REASONS, scrub
 
 
 class RunFailure(Exception):
-    def __init__(self, code):
+    """ADR-009：失败必须携带可定位的脱敏诊断，而不是只有一个笼统错误码。
+
+    diagnostic 只进入服务端日志与 job 的私有字段（下划线前缀），
+    由 public() 过滤，不会出现在任何 HTTP 响应中。
+    """
+
+    def __init__(self, code, *, stage=None, exit_code=None, signal_name=None, detail=None):
         self.code = code
+        self.diagnostic = {
+            "reason": REASONS.get(code, "conversion-error"),
+            "stage": stage,
+            "exitCode": exit_code,
+            "signal": signal_name,
+            "detail": scrub(detail) if detail else None,
+        }
+        super().__init__(code)
 
 
 class Sandbox:
@@ -69,8 +83,14 @@ class Sandbox:
     async def _execute(self, command, cancel, on_stage, timeout, memory=None):
         s = self.settings
         command = [sys.executable, str(Path(__file__).with_name("limit_exec.py")), str(memory or s.process_memory_bytes), str(s.max_output_bytes), str(math.ceil(timeout)), *command]
-        process = await asyncio.create_subprocess_exec(*command, stdin=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, start_new_session=True, env={"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"})
+        try:
+            process = await asyncio.create_subprocess_exec(*command, stdin=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, start_new_session=True, env={"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"})
+        except OSError as error:
+            # ADR-009：进程根本没起来，与转换失败必须区分开。
+            raise RunFailure("SPAWN_FAILED", stage="spawn", detail=f"{type(error).__name__}: {error}")
         stdout = bytearray()
+        stderr_tail = bytearray()
+        last_stage = {"value": None}
 
         async def read(stream, progress=False):
             total = 0
@@ -82,6 +102,11 @@ class Sandbox:
                 if not progress:
                     stdout.extend(chunk)
                     continue
+                # ADR-009：默认不采集 stderr；管理员显式开启后只保留有限尾部。
+                if s.diagnostic_stderr:
+                    stderr_tail.extend(chunk)
+                    if len(stderr_tail) > 8192:
+                        del stderr_tail[:-8192]
                 pending.extend(chunk)
                 while b"\n" in pending:
                     line, _, rest = pending.partition(b"\n")
@@ -90,6 +115,7 @@ class Sandbox:
                         event = json.loads(line)
                         stage = event.get("stage")
                         if stage in {"load-config", "queued", "preflight", "pandoc", "postprocess", "validate", "write-output", "completed"}:
+                            last_stage["value"] = stage
                             on_stage(stage)
                     except (ValueError, TypeError, AttributeError):
                         pass
@@ -99,6 +125,7 @@ class Sandbox:
         cancelled = asyncio.create_task(cancel.wait())
         collector = asyncio.gather(waiter, *readers)
         failure = None
+        failure_stage = None
         try:
             done, _ = await asyncio.wait({collector, cancelled}, timeout=timeout, return_when=asyncio.FIRST_COMPLETED)
             if cancel.is_set():
@@ -109,6 +136,7 @@ class Sandbox:
                 await collector
         except RunFailure as error:
             failure = error.code
+            failure_stage = error.diagnostic.get("stage")
         except asyncio.CancelledError:
             failure = "CANCELLED"
         finally:
@@ -125,15 +153,43 @@ class Sandbox:
                 collector.cancel()
             await asyncio.gather(collector, return_exceptions=True)
         if failure:
-            raise RunFailure(failure)
+            raise RunFailure(failure, stage=failure_stage or last_stage["value"], exit_code=process.returncode, signal_name=_signal_name(process.returncode), detail=_stderr_detail(stderr_tail))
         try:
             payload = json.loads(stdout)
         except (ValueError, UnicodeError):
-            raise RunFailure("CONVERTER_FAILED")
+            # ADR-009：这正是历史 CONVERTER_FAILED 的判定点，必须带上退出码、信号和阶段。
+            raise RunFailure("CONVERTER_FAILED", stage=last_stage["value"], exit_code=process.returncode, signal_name=_signal_name(process.returncode), detail=_stderr_detail(stderr_tail) or _stdout_head(stdout))
         if process.returncode or not payload.get("success"):
             codes = payload.get("errors") or []
             code = codes[0].get("code", "CONVERSION_FAILED") if codes else "CONVERSION_FAILED"
-            raise RunFailure(code)
+            stage = codes[0].get("stage") if codes else None
+            message = codes[0].get("message") if codes else None
+            raise RunFailure(code, stage=stage or last_stage["value"], exit_code=process.returncode, signal_name=_signal_name(process.returncode), detail=message)
         if not payload.get("items") or not payload["items"][0].get("success"):
-            raise RunFailure("CONVERSION_FAILED")
+            item = (payload.get("items") or [{}])[0]
+            errors = item.get("errors") or []
+            raise RunFailure("CONVERSION_FAILED", stage=last_stage["value"], exit_code=process.returncode, detail=errors[0].get("message") if errors else None)
         return payload["items"][0]
+
+
+def _signal_name(returncode):
+    """ADR-009：把 rlimit 触发的负退出码翻译成可读信号名。"""
+    if returncode is None or returncode >= 0:
+        return None
+    try:
+        return signal.Signals(-returncode).name
+    except (ValueError, AttributeError):
+        return f"SIG{-returncode}"
+
+
+def _stderr_detail(buffer):
+    if not buffer:
+        return None
+    return bytes(buffer).decode("utf-8", "replace").strip() or None
+
+
+def _stdout_head(buffer, limit=512):
+    """stdout 不是 JSON 时保留开头片段，便于判断是空输出还是被截断。"""
+    if not buffer:
+        return "<empty stdout>"
+    return bytes(buffer[:limit]).decode("utf-8", "replace")

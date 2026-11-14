@@ -43,6 +43,9 @@ def failure(code, document=None):
         "JOB_TIMEOUT": "任务超过总执行时限。",
         "QUEUE_TIMEOUT": "排队时间超过限制。",
         "CONVERTER_OUTPUT_LIMIT": "转换产生的诊断或输出超过限制。",
+        "CONVERTER_FAILED": "转换进程未返回可解析结果，请联系管理员并提供任务号。",
+        "SPAWN_FAILED": "转换进程未能启动，请联系管理员并提供任务号。",
+        "SANDBOX_UNAVAILABLE": "隔离环境不可用，暂时无法转换。",
         "OUTPUT_LIMIT": "生成文档超过大小或结构限制。",
         "STORAGE_LIMIT": "服务器存储预算不足，已停止当前文件。",
         "SERVER_RESTARTED": "服务重启中断了任务，请重新提交。",
@@ -193,6 +196,28 @@ class Jobs:
             checksum = hashlib.file_digest(stream, "sha256").hexdigest()
         return {"id": "art_" + secrets.token_hex(16), "filename": filename, "sizeBytes": info.st_size, "sha256": checksum, "_file": path.name}
 
+    def record_diagnostic(self, job, item, error):
+        """ADR-009：按 jobId 记录脱敏诊断，只落服务端日志与私有字段。
+
+        `_diagnostic` 以下划线开头，public() 会整体过滤，因此不会出现在
+        任何 HTTP 响应里；用户只看到稳定的公开错误码。
+        """
+        diagnostic = dict(error.diagnostic)
+        diagnostic["documentId"] = item.get("documentId")
+        diagnostic["code"] = error.code
+        job.setdefault("_diagnostics", []).append(diagnostic)
+        log.warning(
+            "Conversion failed job=%s doc=%s code=%s reason=%s stage=%s exit=%s signal=%s detail=%s",
+            job["jobId"],
+            item.get("documentId"),
+            error.code,
+            diagnostic.get("reason"),
+            diagnostic.get("stage"),
+            diagnostic.get("exitCode"),
+            diagnostic.get("signal"),
+            diagnostic.get("detail"),
+        )
+
     async def execute(self, job):
         s = self.settings
         if time.time() - job["_created"] > s.queue_timeout:
@@ -251,6 +276,7 @@ class Jobs:
                     return
                 item["status"], item["stage"] = "failed", None
                 item["error"] = failure(error.code, item["documentId"])
+                self.record_diagnostic(job, item, error)
             self.store.save(job)
             # CLI report/temporary files are internal and never published.
             for child in output.parent.iterdir():

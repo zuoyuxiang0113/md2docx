@@ -34,6 +34,9 @@ class Settings:
     origins: tuple[str, ...] = ("http://localhost:8000", "http://127.0.0.1:8000")
     docs: bool = False
     worker_enabled: bool = True
+    # ADR-009：默认不采集转换 stderr；管理员显式开启后只保留有限尾部，
+    # 经 scrub() 脱敏写入服务端日志，绝不进入 HTTP 响应。
+    diagnostic_stderr: bool = False
 
     @classmethod
     def from_env(cls):
