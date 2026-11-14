@@ -87,10 +87,12 @@ flowchart TD
 
 ## ADR-009：最小保留、私有诊断与错误契约
 
-- 状态：输入清理、结果保留与归属校验已采用；受控诊断待完善。
+- 状态：已采用（诊断部分于 2026-11-14 补齐）。
 - 当前：终态清理输入/配置，结果默认 24 小时；公开错误不含原始 stderr；原始 CLI 报告清理。
-- 问题：CONVERTER_FAILED 无法区分进程启动、rlimit、安全策略和输出格式问题，运维定位成本高。
-- 建议：按 requestId/jobId 记录经过脱敏的阶段、退出码、资源触发类型；如需临时采集 stderr，管理员显式开启、限字节、限时、私有权限、不采集会话凭证，不能直接返回给用户。
+- 已解决：`RunFailure` 现在携带 `reason`、`stage`、`exitCode`、`signal`、`detail` 五项诊断。`reason` 区分 `sandbox-unavailable`、`spawn-failed`、`stdout-not-json`、`rlimit-memory`、`rlimit-cpu`、`rlimit-filesize`、`rlimit-nproc`、`timeout-wall`、`output-limit`、`cancelled`；`signal` 把负退出码翻译为 `SIGKILL`、`SIGXCPU` 等可读名。
+- 隔离方式：诊断写入 job 的 `_diagnostics` 私有字段，`public()` 递归过滤下划线前缀，因此不会出现在任何 HTTP 响应；用户仍只看到稳定的公开错误码与中文提示。
+- 日志：每次失败按 `jobId`、`documentId`、`code`、`reason`、`stage`、`exit`、`signal`、`detail` 记一条服务端 WARNING。
+- stderr 采集：默认关闭（`MD2DOCX_DIAGNOSTIC_STDERR=0`）。开启后只保留 8 KiB 尾部，经 `scrub()` 去掉主机路径、`Bearer` 凭证与 `token/secret/password/authorization` 赋值，再写入日志。
 - 保留：备份和诊断的实际删除期限需单独定稿，不能用「结果 24 小时」覆盖所有元数据和备份承诺。
 
 ## ADR-010：扩容必须由指标触发
