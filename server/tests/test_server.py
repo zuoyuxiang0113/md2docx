@@ -296,7 +296,6 @@ def test_diagnostic_records_rlimit_signal(tmp_path):
 
 
 def test_stop_on_error_and_expiration(tmp_path):
-def test_stop_on_error_and_expiration(tmp_path):
     value = body()
     value["documents"] = [{"id":"bad","path":"bad.md","content":"![图](missing.png)"}, {"id":"later","path":"later.md","content":"# Later"}]
     value["execution"] = {"missingImages":"stop","batchErrors":"stop"}
